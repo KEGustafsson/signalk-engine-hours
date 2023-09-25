@@ -106,7 +106,7 @@ module.exports = function createPlugin(app) {
                 engines = {
                   paths: []
                 };
-                writeFile(enginesFile, JSON.stringify({
+                writeFile(stateFile, JSON.stringify({
                   engines,
                 }), 'utf-8')
               }); 
