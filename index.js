@@ -1,5 +1,6 @@
 const { readFile, writeFile } = require('fs/promises');
 const { join } = require('path');
+const lockfile = require('proper-lockfile');
 
 module.exports = function createPlugin(app) {
   const plugin = {};
@@ -7,12 +8,32 @@ module.exports = function createPlugin(app) {
   plugin.name = 'SignalK Engine Hours';
   plugin.description = 'Tbd';
 
-  let engines = { paths: [] };
+  let engines = {};
+  let state;
   let unsubscribes = [];
   const setStatus = app.setPluginStatus || app.setProviderStatus;
+
+  const retryOptions = {
+    retries: {
+        retries: 5,
+        factor: 3,
+        minTimeout: 1 * 1000,
+        maxTimeout: 60 * 1000,
+        randomize: true,
+    }
+  };
   
   plugin.start = function start(options) {
     const enginesFile = join(app.getDataDirPath(), 'engines.json');
+    readFile(enginesFile, 'utf-8')
+      .catch((e) => {
+        engines = {
+          paths: []
+        };
+        writeFile(enginesFile, JSON.stringify({
+          engines,
+        }), 'utf-8')
+      });
 
     const subscription = {
       context: 'vessels.self',
@@ -47,7 +68,6 @@ module.exports = function createPlugin(app) {
     }
     */
 
-
     app.subscriptionmanager.subscribe(
       subscription,
       unsubscribes,
@@ -63,58 +83,49 @@ module.exports = function createPlugin(app) {
             return;
           }
           u.values.forEach((v) => {
-            //console.log(v.path);
-            //console.log(v.value);
             const path = v.path;
             const value = v.value;
 
-            //Write list of engine paths seen before
-            const enginesFile = join(app.getDataDirPath(), 'engines.json');
-            readFile(enginesFile, 'utf-8')
-              .then((content) => JSON.parse(content))
-              .then((data) => {
-                if (!(data.engines.paths.find((item) => item.path === path))) { 
-                  engines.paths.push({path: path});
-                  writeFile(enginesFile, JSON.stringify({
-                    engines,
-                  }), 'utf-8')
-                }
+            lockfile.lock(enginesFile, retryOptions)
+              .then((release) => {
+                readFile(enginesFile, 'utf-8')
+                  .then((content) => JSON.parse(content))
+                  .then((data) => {
+                    const pathObject = data.engines.paths.find((item) => item.path === path);
+                    if (!pathObject) {
+                      data.engines.paths.push(
+                        {
+                          path: path,
+                          state: null,
+                          time: new Date().toISOString(),
+                        }
+                      );
+                      const engines = data.engines
+                      writeFile(enginesFile, JSON.stringify({
+                        engines,
+                      }), 'utf-8')
+                    }
+                    if (pathObject) {
+                      pathObject.state = pathObject.state + options.updateRate;
+                      pathObject.time = new Date().toISOString();
+                      console.log(JSON.stringify(data.engines, null, 2))
+                      const engines = data.engines
+                      writeFile(enginesFile, JSON.stringify({
+                        engines,
+                      }), 'utf-8')
+                    }
+                  })
+                  .catch((e) => {
+                  });
+                return release();
               })
               .catch((e) => {
-                engines = {
-                  paths: []
-                };
-                writeFile(enginesFile, JSON.stringify({
-                  engines,
-                }), 'utf-8')
-              }); 
-
-            //Update persistent hours log data to disk
-            const stateFile = join(app.getDataDirPath(), path + '.json');
-            readFile(stateFile, 'utf-8')
-              .then((content) => JSON.parse(content))
-              .then((data) => {
-                const state = options.updateRate + data.state
-                writeFile(stateFile, JSON.stringify({
-                  state,
-                  time: new Date().toISOString(),
-                }), 'utf-8')
-                app.debug(path)           
-                app.debug(data)           
-              })
-              .catch((e) => {
-                engines = {
-                  paths: []
-                };
-                writeFile(stateFile, JSON.stringify({
-                  engines,
-                }), 'utf-8')
+                console.error(e)
               }); 
           });
         });
       },
     );
-
   };
 
   plugin.stop = function stop() {
