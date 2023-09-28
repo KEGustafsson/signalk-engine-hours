@@ -1,4 +1,4 @@
-const { readFile, writeFile } = require('fs/promises');
+const { readFile, writeFile, access } = require('fs/promises');
 const { join } = require('path');
 
 module.exports = function createPlugin(app) {
@@ -14,15 +14,16 @@ module.exports = function createPlugin(app) {
 
   plugin.start = function start(options) {
     const enginesFile = join(app.getDataDirPath(), 'engines.json');
-    try {
-      readFile(enginesFile, 'utf-8')
+    access(enginesFile)
+      .then(() => {
+        readFile(enginesFile, 'utf-8')
         .then((content) => JSON.parse(content))
         .then((data) => {
           engines = data.engines;
         });
-    } catch (error) {
-      // Nothing here
-    }
+      })
+      .catch((error) => {});
+    
     const subscription = {
       context: 'vessels.self',
       subscribe: [
@@ -56,38 +57,41 @@ module.exports = function createPlugin(app) {
                   time: new Date().toISOString(),
                 },
               );
+              writeFile(enginesFile, JSON.stringify({
+                engines,
+              }), 'utf-8');
             }
-            if (pathObject) {
+            if (pathObject && v.value > 0) {
               pathObject.runTime += options.updateRate;
               pathObject.time = new Date().toISOString();
-            }
-            writeFile(enginesFile, JSON.stringify({
-              engines,
-            }), 'utf-8');
-            app.debug(engines);
-            const matches = v.path.match(/[^.]+\.(.+)\.[^.]+/);
-            const engineName = matches ? matches[1] : null;
-            const { runTime } = pathObject;
-            app.handleMessage(plugin.id, {
-              context: `vessels.${app.selfId}`,
-              updates: [
-                {
-                  source: {
-                    label: plugin.id,
-                  },
-                  timestamp: new Date().toISOString(),
-                  values: [
-                    {
-                      path: `propulsion.${engineName}.runTime`,
-                      value: runTime,
+              writeFile(enginesFile, JSON.stringify({
+                engines,
+              }), 'utf-8');
+              app.debug(engines);
+              const matches = v.path.match(/[^.]+\.(.+)\.[^.]+/);
+              const engineName = matches ? matches[1] : null;
+              const { runTime } = pathObject;
+              app.handleMessage(plugin.id, {
+                context: `vessels.${app.selfId}`,
+                updates: [
+                  {
+                    source: {
+                      label: plugin.id,
                     },
-                  ],
-                },
-              ],
-            });
-            setImmediate(() =>
-            app.emit('connectionwrite', { providerId: plugin.id })
-          )
+                    timestamp: new Date().toISOString(),
+                    values: [
+                      {
+                        path: `propulsion.${engineName}.runTime`,
+                        value: runTime,
+                      },
+                    ],
+                  },
+                ],
+              });
+              setImmediate(() =>
+                app.emit('connectionwrite', { providerId: plugin.id })
+              )
+            }
           });
         });
       },
