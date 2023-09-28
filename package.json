@@ -1,7 +1,7 @@
 {
     "name": "signalk-engine-hours",
     "version": "0.0.1",
-    "description": "Xxx",
+    "description": "Persistent engine hour logger. Log all engines, which report revolutions to SignalK",
     "main": "index.js",
     "scripts": {
         "pretest": "eslint .",
