@@ -9,6 +9,7 @@ module.exports = function createPlugin(app) {
 
   let engines = { paths: [] };
   let unsubscribes = [];
+  /* eslint-disable no-unused-vars */
   const setStatus = app.setPluginStatus || app.setProviderStatus;
 
   plugin.start = function start(options) {
@@ -18,9 +19,10 @@ module.exports = function createPlugin(app) {
         .then((content) => JSON.parse(content))
         .then((data) => {
           engines = data.engines;
-        })
-    } catch (error) { }
-
+        });
+    } catch (error) {
+      // Nothing here
+    }
     const subscription = {
       context: 'vessels.self',
       subscribe: [
@@ -30,30 +32,6 @@ module.exports = function createPlugin(app) {
         },
       ],
     };
-
-    /*
-    function setState(hours) {
-      app.handleMessage(plugin.id, {
-        context: `vessels.${app.selfId}`,
-        updates: [
-          {
-            source: {
-              label: plugin.id,
-            },
-            timestamp: new Date().toISOString(),
-            values: [
-              {
-                path: 'propulsion.engineHours_tests',
-                value: hours,
-              },
-            ],
-          },
-        ],
-      });
-      setStatus(`Xxx`);
-    }
-    */
-
     app.subscriptionmanager.subscribe(
       subscription,
       unsubscribes,
@@ -74,22 +52,42 @@ module.exports = function createPlugin(app) {
               engines.paths.push(
                 {
                   path: v.path,
-                  state: null,
+                  runTime: null,
                   time: new Date().toISOString(),
-                }
+                },
               );
             }
             if (pathObject) {
-              pathObject.state = pathObject.state + options.updateRate;
+              pathObject.runTime += options.updateRate;
               pathObject.time = new Date().toISOString();
             }
             writeFile(enginesFile, JSON.stringify({
               engines,
-            }), 'utf-8')
-            app.debug(engines)
+            }), 'utf-8');
+            app.debug(engines);
+            const matches = v.path.match(/[^.]+\.(.+)\.[^.]+/);
+            const engineName = matches ? matches[1] : null;
+            const { runTime } = pathObject;
+            app.handleMessage(plugin.id, {
+              context: `vessels.${app.selfId}`,
+              updates: [
+                {
+                  source: {
+                    label: plugin.id,
+                  },
+                  timestamp: new Date().toISOString(),
+                  values: [
+                    {
+                      path: `propulsion.${engineName}.runTime`,
+                      value: runTime,
+                    },
+                  ],
+                },
+              ],
+            });
           });
         });
-      }
+      },
     );
   };
 
