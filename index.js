@@ -5,7 +5,7 @@ module.exports = function createPlugin(app) {
   const plugin = {};
   plugin.id = 'signalk-engine-hours';
   plugin.name = 'SignalK Engine Hours';
-  plugin.description = 'Tbd';
+  plugin.description = 'Persistent engine hour logger. Log all engines, which report revolutions to SignalK';
 
   let engines = { paths: [] };
   let unsubscribes = [];
@@ -28,7 +28,7 @@ module.exports = function createPlugin(app) {
       subscribe: [
         {
           path: 'propulsion.*.revolutions',
-          period: options.updateRate * 1000,
+          period: options.updateRate * 60000,
         },
       ],
     };
@@ -85,6 +85,9 @@ module.exports = function createPlugin(app) {
                 },
               ],
             });
+            setImmediate(() =>
+            app.emit('connectionwrite', { providerId: plugin.id })
+          )
           });
         });
       },
@@ -103,7 +106,7 @@ module.exports = function createPlugin(app) {
         type: 'integer',
         default: 1,
         minimum: 1,
-        title: 'How often to check whether vessel is under way (in minutes)',
+        title: 'How often to check whether engine running',
       },
     },
   };
