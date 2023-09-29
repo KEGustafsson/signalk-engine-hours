@@ -4,7 +4,7 @@ const { join } = require('path');
 module.exports = function createPlugin(app) {
   const plugin = {};
   plugin.id = 'signalk-engine-hours';
-  plugin.name = 'SignalK Engine Hours';
+  plugin.name = 'SignalK Engine Hours Logger';
   plugin.description = 'Persistent engine hour logger. Log all engines, which report revolutions to SignalK';
 
   let engines = { paths: [] };
@@ -20,6 +20,12 @@ module.exports = function createPlugin(app) {
         .then((content) => JSON.parse(content))
         .then((data) => {
           engines = data.engines;
+          var numberEngines = Object.keys(engines.paths).length;
+          app.debug("Number of engine: " + numberEngines);
+          app.debug(engines.paths);
+          engines.paths.forEach((engine) => {
+            reportData(engine.path, engine.runTime);
+          })
         });
       })
       .catch((error) => {});
@@ -29,10 +35,36 @@ module.exports = function createPlugin(app) {
       subscribe: [
         {
           path: 'propulsion.*.revolutions',
-          period: options.updateRate * 60000,
+          period: options.updateRate * 1000,
         },
       ],
     };
+
+    function reportData (path, runTime) {
+      const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
+      const engineName = matches ? matches[1] : null;
+      app.handleMessage(plugin.id, {
+        context: `vessels.${app.selfId}`,
+        updates: [
+          {
+            source: {
+              label: plugin.id,
+            },
+            timestamp: new Date().toISOString(),
+            values: [
+              {
+                path: `propulsion.${engineName}.runTime`,
+                value: runTime,
+              },
+            ],
+          },
+        ],
+      });
+      setImmediate(() =>
+        app.emit('connectionwrite', { providerId: plugin.id })
+      )
+    }
+
     app.subscriptionmanager.subscribe(
       subscription,
       unsubscribes,
@@ -53,45 +85,21 @@ module.exports = function createPlugin(app) {
               engines.paths.push(
                 {
                   path: v.path,
-                  runTime: null,
+                  runTime: 0,
                   time: new Date().toISOString(),
                 },
               );
-              writeFile(enginesFile, JSON.stringify({
-                engines,
-              }), 'utf-8');
             }
             if (pathObject && v.value > 0) {
               pathObject.runTime += options.updateRate;
               pathObject.time = new Date().toISOString();
-              writeFile(enginesFile, JSON.stringify({
-                engines,
-              }), 'utf-8');
-              app.debug(engines);
-              const matches = v.path.match(/[^.]+\.(.+)\.[^.]+/);
-              const engineName = matches ? matches[1] : null;
-              const { runTime } = pathObject;
-              app.handleMessage(plugin.id, {
-                context: `vessels.${app.selfId}`,
-                updates: [
-                  {
-                    source: {
-                      label: plugin.id,
-                    },
-                    timestamp: new Date().toISOString(),
-                    values: [
-                      {
-                        path: `propulsion.${engineName}.runTime`,
-                        value: runTime,
-                      },
-                    ],
-                  },
-                ],
-              });
-              setImmediate(() =>
-                app.emit('connectionwrite', { providerId: plugin.id })
-              )
             }
+            writeFile(enginesFile, JSON.stringify({
+              engines,
+            }), 'utf-8');
+            app.debug(engines);
+            const { runTime } = pathObject;
+            reportData(v.path, runTime);
           });
         });
       },
@@ -108,9 +116,9 @@ module.exports = function createPlugin(app) {
     properties: {
       updateRate: {
         type: 'integer',
-        default: 1,
+        default: 60,
         minimum: 1,
-        title: 'How often to check whether engine running',
+        title: 'How often engine revolutions is monitored. Default value is 60s',
       },
     },
   };
