@@ -98,7 +98,11 @@ module.exports = function createPlugin(app) {
               engines,
             }), 'utf-8');
             app.debug(engines);
-            const { runTime } = pathObject;
+            let runTime = 0
+            try {
+              runTime = pathObject.runTime;
+            } catch (error) {
+            }
             reportData(v.path, runTime);
           });
         });
