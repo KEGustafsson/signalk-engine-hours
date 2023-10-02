@@ -89,14 +89,17 @@ module.exports = function createPlugin(app) {
                   time: new Date().toISOString(),
                 },
               );
+              writeFile(enginesFile, JSON.stringify({
+                engines,
+              }), 'utf-8');
             }
             if (pathObject && v.value > 0) {
               pathObject.runTime += options.updateRate;
               pathObject.time = new Date().toISOString();
+              writeFile(enginesFile, JSON.stringify({
+                engines,
+              }), 'utf-8');
             }
-            writeFile(enginesFile, JSON.stringify({
-              engines,
-            }), 'utf-8');
             app.debug(engines);
             let runTime = 0
             try {
