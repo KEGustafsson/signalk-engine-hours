@@ -65,6 +65,12 @@ module.exports = function createPlugin(app) {
       )
     }
 
+    function writeToPersistentStore (engines) {
+      writeFile(enginesFile, JSON.stringify({
+        engines,
+      }), 'utf-8');
+    }
+
     app.subscriptionmanager.subscribe(
       subscription,
       unsubscribes,
@@ -89,16 +95,12 @@ module.exports = function createPlugin(app) {
                   time: new Date().toISOString(),
                 },
               );
-              writeFile(enginesFile, JSON.stringify({
-                engines,
-              }), 'utf-8');
+              writeToPersistentStore(engines);
             }
             if (pathObject && v.value > 0) {
               pathObject.runTime += options.updateRate;
               pathObject.time = new Date().toISOString();
-              writeFile(enginesFile, JSON.stringify({
-                engines,
-              }), 'utf-8');
+              writeToPersistentStore(engines);
             }
             app.debug(engines);
             let runTime = 0
