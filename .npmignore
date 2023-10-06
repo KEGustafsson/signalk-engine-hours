@@ -3,3 +3,5 @@ jspm_packages
 .npm
 .vscode
 .github
+.eslintrc.json
+.prettierrc.json
