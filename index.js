@@ -11,9 +11,16 @@ module.exports = function createPlugin(app) {
   let unsubscribes = [];
   /* eslint-disable no-unused-vars */
   const setStatus = app.setPluginStatus || app.setProviderStatus;
+  let enginesFile
+
+  function writeToPersistentStore (engines) {
+    writeFile(enginesFile, JSON.stringify({
+      engines,
+    }), 'utf-8');
+  }
 
   plugin.start = function start(options) {
-    const enginesFile = join(app.getDataDirPath(), 'engines.json');
+    enginesFile = join(app.getDataDirPath(), 'engines.json');
     access(enginesFile)
       .then(() => {
         readFile(enginesFile, 'utf-8')
@@ -65,12 +72,6 @@ module.exports = function createPlugin(app) {
       )
     }
 
-    function writeToPersistentStore (engines) {
-      writeFile(enginesFile, JSON.stringify({
-        engines,
-      }), 'utf-8');
-    }
-
     app.subscriptionmanager.subscribe(
       subscription,
       unsubscribes,
@@ -113,6 +114,18 @@ module.exports = function createPlugin(app) {
         });
       },
     );
+  };
+
+  plugin.registerWithRouter = (router) => {
+    router.get('/hours', (req, res) => {
+      res.contentType('application/json');
+      res.send(JSON.stringify(engines));
+    });
+    router.put('/hours', (req, res) => {
+      res.status(200).send("OK");
+      engines = req.body;
+      writeToPersistentStore(engines);
+    });
   };
 
   plugin.stop = function stop() {
