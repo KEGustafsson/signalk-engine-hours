@@ -16,6 +16,10 @@
         "signalk-webapp",
         "signalk-category-utility"
     ],
+    "signalk": {
+        "appIcon": "./icons/icon-72x72.png",
+        "displayName": "SignalK Engine Hours"
+    },
     "signalk-plugin-enabled-by-default": false,
     "author": "Karl-Erik Gustafsson",
     "license": "MIT",
