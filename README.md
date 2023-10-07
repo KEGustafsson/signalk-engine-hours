@@ -5,6 +5,7 @@ Signal K engine hours logger keep logged data stored. Engines which reports revo
 ## Versions
 - v0.0.1 Initial release
 - v0.1.0 Improvements, custom API and simple hours editor
+- v0.1.1 Improvements to editor
 
 ## To be done
 - Season/year runtime display  
