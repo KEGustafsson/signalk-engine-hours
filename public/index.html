@@ -58,6 +58,11 @@
                     <label for="runTime${index}">Path: propulsion.${engineName}.runTime:</label><br>
                     <label for="runTime${index}">Time:</label>
                     <input type="number" id="runTime${index}" value="${pathData.runTime}">
+                    <br><br>
+                    <label for="runTime${index}">Path: propulsion.${engineName}.runTimeSeason:</label><br>
+                    <label for="runTimeSeason${index}">Time:</label>
+                    <input type="number" id="runTime${index}" value="${pathData.runTimeSeason}">
+                    <br><br>
                     <button onclick="deleteSection(${index})">Delete</button>
                 `;
                 jsonContainer.appendChild(div);
@@ -111,11 +116,19 @@
         function checkChanges() {
             const saveButton = document.getElementById('save-button');
             const inputs = document.querySelectorAll('input[type="number"]');
+            //console.log(inputs, inputs.length)
             let dataChanged = false;
 
             for (let i = 0; i < inputs.length; i++) {
                 const inputValue = parseFloat(inputs[i].value);
-                const originalValue = jsonData.paths[i].runTime;
+                //console.log(inputValue, i)
+                let originalValue
+                if(i % 2 == 0) {
+                    originalValue = jsonData.paths[parseInt(i/2)].runTime;
+                } else {
+                    originalValue = jsonData.paths[parseInt(i/2)].runTimeSeason;
+                }
+                console.log(inputValue, originalValue)
                 if (inputValue !== originalValue) {
                     dataChanged = true;
                     break;
