@@ -59,9 +59,9 @@
                     <label for="runTime${index}">Time:</label>
                     <input type="number" id="runTime${index}" value="${pathData.runTime}">
                     <br><br>
-                    <label for="runTime${index}">Path: propulsion.${engineName}.runTimeSeason:</label><br>
-                    <label for="runTimeSeason${index}">Time:</label>
-                    <input type="number" id="runTimeSeason${index}" value="${pathData.runTimeSeason}">
+                    <label for="runTimeTrip${index}">Path: propulsion.${engineName}.runTimeTrip:</label><br>
+                    <label for="runTimeTrip${index}">Time:</label>
+                    <input type="number" id="runTimeTrip${index}" value="${pathData.runTimeTrip}">
                     <br><br>
                     <button onclick="deleteSection(${index})">Delete</button>
                 `;
@@ -90,7 +90,7 @@
                     if (i % 2 === 0) {
                         jsonData.paths[Math.floor(i / 2)].runTime = inputValue;
                     } else {
-                        jsonData.paths[Math.floor(i / 2)].runTimeSeason = inputValue;
+                        jsonData.paths[Math.floor(i / 2)].runTimeTrip = inputValue;
                     }
                 }
 
@@ -135,7 +135,7 @@
                 if (i % 2 === 0) {
                     originalValue = jsonData.paths[Math.floor(i / 2)].runTime;
                 } else {
-                    originalValue = jsonData.paths[Math.floor(i / 2)].runTimeSeason;
+                    originalValue = jsonData.paths[Math.floor(i / 2)].runTimeTrip;
                 }
                 if (inputValue !== originalValue) {
                     dataChanged = true;

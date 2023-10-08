@@ -31,7 +31,7 @@ module.exports = function createPlugin(app) {
           app.debug("Number of engine: " + numberEngines);
           app.debug(engines.paths);
           engines.paths.forEach((engine) => {
-            reportData(engine.path, engine.runTime, engine.runTimeSeason);
+            reportData(engine.path, engine.runTime, engine.runTimeTrip);
           })
         });
       })
@@ -47,7 +47,7 @@ module.exports = function createPlugin(app) {
       ],
     };
 
-    function reportData (path, runTime, runTimeSeason) {
+    function reportData (path, runTime, runTimeTrip) {
       const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
       const engineName = matches ? matches[1] : null;
       app.handleMessage(plugin.id, {
@@ -61,13 +61,21 @@ module.exports = function createPlugin(app) {
             values: [
               {
                 path: `propulsion.${engineName}.runTime`,
-                value: runTime,
+                value: runTime || 0,
               },
               {
-                path: `propulsion.${engineName}.runTimeSeason`,
-                value: runTimeSeason || 0,
+                path: `propulsion.${engineName}.runTimeTrip`,
+                value: runTimeTrip || 0,
               },
             ],
+            meta: [
+              {
+                path: `propulsion.${engineName}.runTimeTrip`,
+                value: {
+                  units: "s",
+                }
+              }
+            ]
           },
         ],
       });
@@ -97,7 +105,7 @@ module.exports = function createPlugin(app) {
                 {
                   path: v.path,
                   runTime: 0,
-                  runTimeSeason: 0,
+                  runTimeTrip: 0,
                   time: new Date().toISOString(),
                 },
               );
@@ -105,22 +113,22 @@ module.exports = function createPlugin(app) {
             }
             if (pathObject && v.value > 0) {
               pathObject.runTime += options.updateRate + 0;
-              pathObject.runTimeSeason += options.updateRate + 0;
+              pathObject.runTimeTrip += options.updateRate + 0;
               pathObject.time = new Date().toISOString();
               writeToPersistentStore(engines);
             }
             app.debug(engines);
             let runTime = 0
-            let runTimeSeason = 0
+            let runTimeTrip = 0
             try {
               runTime = pathObject.runTime;
             } catch (error) {
             }
             try {
-              runTimeSeason = pathObject.runTimeSeason;
+              runTimeTrip = pathObject.runTimeTrip;
             } catch (error) {
             }
-            reportData(v.path, runTime, runTimeSeason);
+            reportData(v.path, runTime, runTimeTrip);
           });
         });
       },
