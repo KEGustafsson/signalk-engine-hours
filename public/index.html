@@ -3,10 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .title-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .title-container img {
+            margin-right: 10px; /* Optional: Add spacing between the image and text */
+        }
+    </style>
     <title>Engine Hours Editor</title>
+    <link rel="icon" type="image/png" href="icons/icon-72x72.png">
 </head>
-<body style="background-color: white;">
-    <h1>Engine Hours Editor</h1>
+<body>
+    <div class="title-container">
+        <img src="icons/icon-72x72.png" alt="Icon">
+        <h1 style="margin: 0;">Engine Hours Editor</h1>
+    </div>
     <div id="json-container"></div>
     <br>
     <button id="reload-button">Reload Data</button>
@@ -40,7 +54,9 @@
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
                 const engineName = matches ? matches[1] : null;
                 div.innerHTML = `
-                    <label for="runTime${index}">Path: propulsion.${engineName}.runTime: </label>
+                    <br>
+                    <label for="runTime${index}">Path: propulsion.${engineName}.runTime:</label><br>
+                    <label for="runTime${index}">Time:</label>
                     <input type="number" id="runTime${index}" value="${pathData.runTime}">
                     <button onclick="deleteSection(${index})">Delete</button>
                 `;
