@@ -31,7 +31,7 @@ module.exports = function createPlugin(app) {
           app.debug("Number of engine: " + numberEngines);
           app.debug(engines.paths);
           engines.paths.forEach((engine) => {
-            reportData(engine.path, engine.runTime);
+            reportData(engine.path, engine.runTime, engine.runTimeSeason);
           })
         });
       })
@@ -47,7 +47,7 @@ module.exports = function createPlugin(app) {
       ],
     };
 
-    function reportData (path, runTime) {
+    function reportData (path, runTime, runTimeSeason) {
       const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
       const engineName = matches ? matches[1] : null;
       app.handleMessage(plugin.id, {
@@ -62,6 +62,10 @@ module.exports = function createPlugin(app) {
               {
                 path: `propulsion.${engineName}.runTime`,
                 value: runTime,
+              },
+              {
+                path: `propulsion.${engineName}.runTimeSeason`,
+                value: runTimeSeason || 0,
               },
             ],
           },
@@ -93,23 +97,30 @@ module.exports = function createPlugin(app) {
                 {
                   path: v.path,
                   runTime: 0,
+                  runTimeSeason: 0,
                   time: new Date().toISOString(),
                 },
               );
               writeToPersistentStore(engines);
             }
             if (pathObject && v.value > 0) {
-              pathObject.runTime += options.updateRate;
+              pathObject.runTime += options.updateRate + 0;
+              pathObject.runTimeSeason += options.updateRate + 0;
               pathObject.time = new Date().toISOString();
               writeToPersistentStore(engines);
             }
             app.debug(engines);
             let runTime = 0
+            let runTimeSeason = 0
             try {
               runTime = pathObject.runTime;
             } catch (error) {
             }
-            reportData(v.path, runTime);
+            try {
+              runTimeSeason = pathObject.runTimeSeason;
+            } catch (error) {
+            }
+            reportData(v.path, runTime, runTimeSeason);
           });
         });
       },
