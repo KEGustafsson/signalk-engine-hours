@@ -68,6 +68,13 @@ module.exports = function createPlugin(app) {
                 value: runTimeTrip || 0,
               },
             ],
+          },
+        ],
+      });
+      app.handleMessage(plugin.id, {
+        context: `vessels.${app.selfId}`,
+        updates: [
+          {
             meta: [
               {
                 path: `propulsion.${engineName}.runTimeTrip`,
