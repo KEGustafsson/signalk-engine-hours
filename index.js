@@ -71,21 +71,23 @@ module.exports = function createPlugin(app) {
           },
         ],
       });
-      app.handleMessage(plugin.id, {
-        context: `vessels.${app.selfId}`,
-        updates: [
-          {
-            meta: [
-              {
-                path: `propulsion.${engineName}.runTimeTrip`,
-                value: {
-                  units: "s",
+      if (!Object.keys(app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta')).length) {
+        app.handleMessage(plugin.id, {
+          context: `vessels.${app.selfId}`,
+          updates: [
+            {
+              meta: [
+                {
+                  path: `propulsion.${engineName}.runTimeTrip`,
+                  value: {
+                    units: "s",
+                  }
                 }
-              }
-            ]
-          },
-        ],
-      });
+              ]
+            },
+          ],
+        });
+      }
       setImmediate(() =>
         app.emit('connectionwrite', { providerId: plugin.id })
       )
