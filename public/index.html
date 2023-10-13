@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,14 +11,29 @@
         .title-container img {
             margin-right: 10px;
         }
+
         .container {
             min-width: 480px;
-            max-width: 1920px; /* Set the maximum width to 1800 pixels */
+            max-width: 1920px;
+            /* Set the maximum width to 1800 pixels */
+        }
+
+        .empty-row {
+            height: 20px;
+            /* Adjust the height as needed */
+            background-color: #fff;
+            /* Background color for the empty row */
+        }
+
+        /* Add some margin to the inputs for better tooltip positioning */
+        input[type="number"] {
+            margin-right: 10px;
         }
     </style>
     <title>Engine Hours Editor</title>
     <link rel="icon" type="image/png" href="icons/icon-72x72.png">
 </head>
+
 <body style="background-color: white">
     <div class="container">
         <div class="title-container d-flex align-items-center">
@@ -25,14 +41,16 @@
             <h1 class="m-0">Engine Hours Editor</h1>
         </div>
         <div id="json-container"></div>
-            <br>
+        <br>
         <button id="reload-button" class="btn btn-primary">Reload Data</button>
         <button id="save-button" class="btn btn-success" disabled>Save Changes</button>
+        <br><br>
+        Note: Hover over the time values to display in hours and minutes (h:mm).
     </div>
 
     <script src="bootstrap/bootstrap.bundle.min.js"></script>
     <script>
-                const url = window.location.origin + '/plugins/signalk-engine-hours/hours';
+        const url = window.location.origin + '/plugins/signalk-engine-hours/hours';
         let jsonData = null;
 
         // Function to fetch JSON data from the server
@@ -44,6 +62,7 @@
                 }
                 jsonData = await response.json();
                 displayJsonData();
+                initializeTooltips(); // Initialize tooltips after rendering
             } catch (error) {
                 console.error(error);
             }
@@ -58,13 +77,15 @@
                 const div = document.createElement('div');
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
                 const engineName = matches ? matches[1] : null;
-                div.innerHTML = `
+                if (index == 0) {
+                    div.innerHTML = `
                     <br>
                     <div class="row col" style="min-width: 1000px; max-width: 1200px;">
-                        <div class="input-group col">
-                            <span class="input-group-text col-4" id="inputGroup-sizing-default">Path</span>
-                            <span class="input-group-text col-3 d-flex justify-content-center" id="inputGroup-sizing-default">Time [s]</span>
+                        <div class="input-group col col-md-auto">
+                            <span class="input-group-text col-4" id="inputGroup-sizing-default"><b>Path</b></span>
+                            <span class="input-group-text col-3 d-flex justify-content-center" id="inputGroup-sizing-default"><b>Time</b></span>
                         </div>
+                        <div class="empty-row"></div>
                         <div class="input-group col-md-auto">
                             <label class="input-group-text col-4" for="runTime${index}">propulsion.${engineName}.runTime</label>
                             <input class="input-group-text col-3" type="number" id="runTime${index}" value="${pathData.runTime}">
@@ -76,10 +97,38 @@
                     </div>                    
                     <button id="delete-button" class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
                 `;
+                } else {
+                    div.innerHTML = `
+                    <br>
+                    <div class="row col" style="min-width: 1000px; max-width: 1200px;">
+                        <div class="input-group col-md-auto">
+                            <label class="input-group-text col-4" for="runTime${index}">propulsion.${engineName}.runTime</label>
+                            <input class="input-group-text col-3" type="number" id="runTime${index}" value="${pathData.runTime}">
+                        </div>
+                        <div class="input-group col-md-auto">
+                            <label class="input-group-text col-4" for="runTimeTrip${index}">propulsion.${engineName}.runTimeTrip</label>
+                            <input class="input-group-text col-3" type="number" id="runTimeTrip${index}" value="${pathData.runTimeTrip}">
+                        </div>
+                    </div>                    
+                    <button id="delete-button" class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
+                `;
+                }
                 jsonContainer.appendChild(div);
             });
 
             checkChanges(); // Enable/disable the Save button after rendering
+        }
+
+        // Function to initialize tooltips for input fields
+        function initializeTooltips() {
+            const inputs = document.querySelectorAll('input[type="number"]');
+            inputs.forEach(input => {
+                new bootstrap.Tooltip(input, {
+                    title: secondsToHoursMinutes(input.value),
+                    placement: 'top', // Adjust the placement as needed
+                    trigger: 'hover focus',
+                });
+            });
         }
 
         // Function to delete a section from the JSON data
@@ -157,6 +206,14 @@
             saveButton.disabled = !dataChanged;
         }
 
+        function secondsToHoursMinutes(seconds) {
+            const hours = Math.floor(seconds / 3600); // 1 hour = 3600 seconds
+            const minutes = Math.floor((seconds % 3600) / 60); // 1 minute = 60 seconds
+            // Use string formatting to ensure minutes always have two digits
+            const formattedMinutes = (minutes < 10) ? `0${minutes}` : `${minutes}`;
+            return `${hours}:${formattedMinutes}`;
+        }
+
         // Event listener for the Reload Data button
         document.getElementById('reload-button').addEventListener('click', fetchData);
 
@@ -171,8 +228,22 @@
             }
         });
 
+        // Event listener to track changes in input values
+        document.addEventListener('input', (event) => {
+            const input = event.target;
+            if (input.tagName === 'INPUT' && input.type === 'number') {
+                const tooltip = bootstrap.Tooltip.getInstance(input);
+                if (tooltip) {
+                    tooltip._config.title = secondsToHoursMinutes(input.value);
+                    tooltip._fixTitle();
+                    tooltip.show();
+                }
+            }
+        });
+
         // Fetch and display data when the page loads
         fetchData();
     </script>
 </body>
+
 </html>
