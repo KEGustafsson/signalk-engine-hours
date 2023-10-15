@@ -7,28 +7,26 @@
     <!-- Include Bootstrap CSS -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <style>
-        /* Custom styles can still be used alongside Bootstrap */
         .title-container img {
             margin-right: 10px;
         }
-
         .container {
             min-width: 480px;
             max-width: 1920px;
             /* Set the maximum width to 1800 pixels */
         }
-
         .empty-row {
             height: 20px;
             /* Adjust the height as needed */
             background-color: #fff;
             /* Background color for the empty row */
         }
-
-        /* Add some margin to the inputs for better tooltip positioning */
         input[type="number"] {
             margin-right: 10px;
-        }
+        }        
+        .input-group {
+            padding-bottom: 1px;
+        }   
     </style>
     <title>Engine Hours Editor</title>
     <link rel="icon" type="image/png" href="icons/icon-72x72.png">
@@ -124,8 +122,11 @@
             const inputs = document.querySelectorAll('input[type="number"]');
             inputs.forEach(input => {
                 new bootstrap.Tooltip(input, {
-                    title: secondsToHoursMinutes(input.value),
-                    placement: 'top', // Adjust the placement as needed
+                    container: 'body',
+                    html: true,
+                    delay: 100,
+                    title: "hrs:min<br>" + secondsToHoursMinutes(input.value),
+                    placement: 'left', // Adjust the placement as needed
                     trigger: 'hover focus',
                 });
             });
@@ -234,7 +235,8 @@
             if (input.tagName === 'INPUT' && input.type === 'number') {
                 const tooltip = bootstrap.Tooltip.getInstance(input);
                 if (tooltip) {
-                    tooltip._config.title = secondsToHoursMinutes(input.value);
+                    //tooltip._config.title = secondsToHoursMinutes(input.value);
+                    tooltip._config.title = "hrs:min<br>" + secondsToHoursMinutes(input.value)
                     tooltip._fixTitle();
                     tooltip.show();
                 }
