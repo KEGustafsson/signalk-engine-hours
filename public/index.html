@@ -42,8 +42,6 @@
         <br>
         <button id="reload-button" class="btn btn-primary">Reload Data</button>
         <button id="save-button" class="btn btn-success" disabled>Save Changes</button>
-        <br><br>
-        Note: Hover over the time values to display in hours and minutes (h:mm).
     </div>
 
     <script src="bootstrap/bootstrap.bundle.min.js"></script>
@@ -60,7 +58,6 @@
                 }
                 jsonData = await response.json();
                 displayJsonData();
-                initializeTooltips(); // Initialize tooltips after rendering
             } catch (error) {
                 console.error(error);
             }
@@ -81,16 +78,16 @@
                     <div class="row col" style="min-width: 1000px; max-width: 1200px;">
                         <div class="input-group col col-md-auto">
                             <span class="input-group-text col-4" id="inputGroup-sizing-default"><b>Path</b></span>
-                            <span class="input-group-text col-3 d-flex justify-content-center" id="inputGroup-sizing-default"><b>Time</b></span>
+                            <span class="input-group-text col-3 d-flex justify-content-center" id="inputGroup-sizing-default"><b>Time [h]</b></span>
                         </div>
                         <div class="empty-row"></div>
                         <div class="input-group col-md-auto">
                             <label class="input-group-text col-4" for="runTime${index}">propulsion.${engineName}.runTime</label>
-                            <input class="input-group-text col-3" type="number" id="runTime${index}" value="${pathData.runTime}">
+                            <input class="input-group-text col-3" type="number" step='1.0' id="runTime${index}" value="${parseFloat(pathData.runTime/3600).toFixed(1)}">
                         </div>
                         <div class="input-group col-md-auto">
                             <label class="input-group-text col-4" for="runTimeTrip${index}">propulsion.${engineName}.runTimeTrip</label>
-                            <input class="input-group-text col-3" type="number" id="runTimeTrip${index}" value="${pathData.runTimeTrip}">
+                            <input class="input-group-text col-3" type="number" step='1.0' id="runTimeTrip${index}" value="${parseFloat(pathData.runTimeTrip/3600).toFixed(1)}">
                         </div>
                     </div>                    
                     <button id="delete-button" class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
@@ -101,11 +98,11 @@
                     <div class="row col" style="min-width: 1000px; max-width: 1200px;">
                         <div class="input-group col-md-auto">
                             <label class="input-group-text col-4" for="runTime${index}">propulsion.${engineName}.runTime</label>
-                            <input class="input-group-text col-3" type="number" id="runTime${index}" value="${pathData.runTime}">
+                            <input class="input-group-text col-3" type="number" id="runTime${index}" value="${parseFloat(pathData.runTime/3600).toFixed(1)}">
                         </div>
                         <div class="input-group col-md-auto">
                             <label class="input-group-text col-4" for="runTimeTrip${index}">propulsion.${engineName}.runTimeTrip</label>
-                            <input class="input-group-text col-3" type="number" id="runTimeTrip${index}" value="${pathData.runTimeTrip}">
+                            <input class="input-group-text col-3" type="number" id="runTimeTrip${index}" value="${parseFloat(pathData.runTimeTrip/3600).toFixed(1)}">
                         </div>
                     </div>                    
                     <button id="delete-button" class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
@@ -115,21 +112,6 @@
             });
 
             checkChanges(); // Enable/disable the Save button after rendering
-        }
-
-        // Function to initialize tooltips for input fields
-        function initializeTooltips() {
-            const inputs = document.querySelectorAll('input[type="number"]');
-            inputs.forEach(input => {
-                new bootstrap.Tooltip(input, {
-                    container: 'body',
-                    html: true,
-                    delay: 100,
-                    title: "hrs:min<br>" + secondsToHoursMinutes(input.value),
-                    placement: 'left', // Adjust the placement as needed
-                    trigger: 'hover focus',
-                });
-            });
         }
 
         // Function to delete a section from the JSON data
@@ -149,9 +131,9 @@
                 for (let i = 0; i < inputs.length; i++) {
                     const inputValue = parseFloat(inputs[i].value);
                     if (i % 2 === 0) {
-                        jsonData.paths[Math.floor(i / 2)].runTime = inputValue;
+                        jsonData.paths[Math.floor(i / 2)].runTime = parseInt(inputValue* 3600);
                     } else {
-                        jsonData.paths[Math.floor(i / 2)].runTimeTrip = inputValue;
+                        jsonData.paths[Math.floor(i / 2)].runTimeTrip = parseInt(inputValue * 3600);
                     }
                 }
 
@@ -191,7 +173,7 @@
             let dataChanged = false;
 
             for (let i = 0; i < inputs.length; i++) {
-                const inputValue = parseFloat(inputs[i].value);
+                const inputValue = parseInt(inputs[i].value * 3600);
                 let originalValue;
                 if (i % 2 === 0) {
                     originalValue = jsonData.paths[Math.floor(i / 2)].runTime;
@@ -207,14 +189,6 @@
             saveButton.disabled = !dataChanged;
         }
 
-        function secondsToHoursMinutes(seconds) {
-            const hours = Math.floor(seconds / 3600); // 1 hour = 3600 seconds
-            const minutes = Math.floor((seconds % 3600) / 60); // 1 minute = 60 seconds
-            // Use string formatting to ensure minutes always have two digits
-            const formattedMinutes = (minutes < 10) ? `0${minutes}` : `${minutes}`;
-            return `${hours}:${formattedMinutes}`;
-        }
-
         // Event listener for the Reload Data button
         document.getElementById('reload-button').addEventListener('click', fetchData);
 
@@ -226,20 +200,6 @@
             const input = event.target;
             if (input.tagName === 'INPUT' && input.type === 'number') {
                 checkChanges();
-            }
-        });
-
-        // Event listener to track changes in input values
-        document.addEventListener('input', (event) => {
-            const input = event.target;
-            if (input.tagName === 'INPUT' && input.type === 'number') {
-                const tooltip = bootstrap.Tooltip.getInstance(input);
-                if (tooltip) {
-                    //tooltip._config.title = secondsToHoursMinutes(input.value);
-                    tooltip._config.title = "hrs:min<br>" + secondsToHoursMinutes(input.value)
-                    tooltip._fixTitle();
-                    tooltip.show();
-                }
             }
         });
 
