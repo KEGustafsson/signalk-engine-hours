@@ -31,7 +31,7 @@ module.exports = function createPlugin(app) {
           app.debug("Number of engine: " + numberEngines);
           app.debug(engines.paths);
           engines.paths.forEach((engine) => {
-            reportData(engine.path, engine.runTime, engine.runTimeTrip);
+            reportData(engine.path, engine.runTime, engine.runTimeTrip, engine.time);
           })
         });
       })
@@ -47,7 +47,7 @@ module.exports = function createPlugin(app) {
       ],
     };
 
-    function reportData (path, runTime, runTimeTrip) {
+    function reportData (path, runTime, runTimeTrip, logTime) {
       const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
       const engineName = matches ? matches[1] : null;
       app.handleMessage(plugin.id, {
@@ -57,7 +57,7 @@ module.exports = function createPlugin(app) {
             source: {
               label: plugin.id,
             },
-            timestamp: new Date().toISOString(),
+            timestamp: logTime || new Date().toISOString(),
             values: [
               {
                 path: `propulsion.${engineName}.runTime`,
@@ -129,6 +129,7 @@ module.exports = function createPlugin(app) {
             app.debug(engines);
             let runTime = 0
             let runTimeTrip = 0
+            let logTime = 0
             try {
               runTime = pathObject.runTime;
             } catch (error) {
@@ -137,7 +138,11 @@ module.exports = function createPlugin(app) {
               runTimeTrip = pathObject.runTimeTrip;
             } catch (error) {
             }
-            reportData(v.path, runTime, runTimeTrip);
+            try {
+              logTime = pathObject.time;
+            } catch (error) {
+            }
+            reportData(v.path, runTime, runTimeTrip, logTime);
           });
         });
       },
