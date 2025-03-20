@@ -12,3 +12,4 @@ Signal K engine hours logger keep logged data stored. Engines which reports revo
 - v0.3.1 fixes to editor UI
 - v0.4.0 tooltip to show hrs:min
 - v1.0.0 1st release
+- v1.1.0 fix: improve error handling and validation for engine data
