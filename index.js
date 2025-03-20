@@ -9,34 +9,37 @@ module.exports = function createPlugin(app) {
 
   let engines = { paths: [] };
   let unsubscribes = [];
-  /* eslint-disable no-unused-vars */
   const setStatus = app.setPluginStatus || app.setProviderStatus;
-  let enginesFile
+  let enginesFile;
 
-  function writeToPersistentStore (engines) {
-    writeFile(enginesFile, JSON.stringify({
-      engines,
-    }), 'utf-8');
+  function writeToPersistentStore(engines) {
+    return writeFile(enginesFile, JSON.stringify({ engines }), 'utf-8');
   }
 
   plugin.start = function start(options) {
     enginesFile = join(app.getDataDirPath(), 'engines.json');
     access(enginesFile)
       .then(() => {
-        readFile(enginesFile, 'utf-8')
-        .then((content) => JSON.parse(content))
-        .then((data) => {
+        return readFile(enginesFile, 'utf-8');
+      })
+      .then((content) => {
+        const data = JSON.parse(content);
+        if (data && data.engines) {
           engines = data.engines;
-          var numberEngines = Object.keys(engines.paths).length;
-          app.debug("Number of engine: " + numberEngines);
-          app.debug(engines.paths);
-          engines.paths.forEach((engine) => {
-            reportData(engine.path, engine.runTime, engine.runTimeTrip, engine.time);
-          })
+        } else {
+          app.error('Invalid data structure in engines.json');
+        }
+        const numberEngines = Object.keys(engines.paths).length;
+        app.debug("Number of engine: " + numberEngines);
+        app.debug(engines.paths);
+        engines.paths.forEach((engine) => {
+          reportData(engine.path, engine.runTime, engine.runTimeTrip, engine.time);
         });
       })
-      .catch((error) => {});
-    
+      .catch((error) => {
+        app.error(`Error accessing engines file: ${error.message}`);
+      });
+
     const subscription = {
       context: 'vessels.self',
       subscribe: [
@@ -47,26 +50,18 @@ module.exports = function createPlugin(app) {
       ],
     };
 
-    function reportData (path, runTime, runTimeTrip, logTime) {
+    function reportData(path, runTime, runTimeTrip, logTime) {
       const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
       const engineName = matches ? matches[1] : null;
       app.handleMessage(plugin.id, {
         context: `vessels.${app.selfId}`,
         updates: [
           {
-            source: {
-              label: plugin.id,
-            },
+            source: { label: plugin.id },
             timestamp: logTime || new Date().toISOString(),
             values: [
-              {
-                path: `propulsion.${engineName}.runTime`,
-                value: runTime || 0,
-              },
-              {
-                path: `propulsion.${engineName}.runTimeTrip`,
-                value: runTimeTrip || 0,
-              },
+              { path: `propulsion.${engineName}.runTime`, value: runTime || 0 },
+              { path: `propulsion.${engineName}.runTimeTrip`, value: runTimeTrip || 0 },
             ],
           },
         ],
@@ -79,18 +74,14 @@ module.exports = function createPlugin(app) {
               meta: [
                 {
                   path: `propulsion.${engineName}.runTimeTrip`,
-                  value: {
-                    units: "s",
-                  }
-                }
-              ]
+                  value: { units: "s" },
+                },
+              ],
             },
           ],
         });
       }
-      setImmediate(() =>
-        app.emit('connectionwrite', { providerId: plugin.id })
-      )
+      setImmediate(() => app.emit('connectionwrite', { providerId: plugin.id }));
     }
 
     app.subscriptionmanager.subscribe(
@@ -100,49 +91,28 @@ module.exports = function createPlugin(app) {
         app.error(`Error: ${subscriptionError}`);
       },
       (delta) => {
-        if (!delta.updates) {
-          return;
-        }
+        if (!delta.updates) return;
         delta.updates.forEach((u) => {
-          if (!u.values) {
-            return;
-          }
+          if (!u.values) return;
           u.values.forEach((v) => {
             const pathObject = engines.paths.find((item) => item.path === v.path);
             if (!pathObject) {
-              engines.paths.push(
-                {
-                  path: v.path,
-                  runTime: 0,
-                  runTimeTrip: 0,
-                  time: new Date().toISOString(),
-                },
-              );
+              engines.paths.push({
+                path: v.path,
+                runTime: 0,
+                runTimeTrip: 0,
+                time: new Date().toISOString(),
+              });
               writeToPersistentStore(engines);
             }
             if (pathObject && v.value > 0) {
-              pathObject.runTime += options.updateRate + 0;
-              pathObject.runTimeTrip += options.updateRate + 0;
+              pathObject.runTime += options.updateRate;
+              pathObject.runTimeTrip += options.updateRate;
               pathObject.time = new Date().toISOString();
               writeToPersistentStore(engines);
             }
             app.debug(engines);
-            let runTime = 0
-            let runTimeTrip = 0
-            let logTime = 0
-            try {
-              runTime = pathObject.runTime;
-            } catch (error) {
-            }
-            try {
-              runTimeTrip = pathObject.runTimeTrip;
-            } catch (error) {
-            }
-            try {
-              logTime = pathObject.time;
-            } catch (error) {
-            }
-            reportData(v.path, runTime, runTimeTrip, logTime);
+            reportData(v.path, pathObject.runTime, pathObject.runTimeTrip, pathObject.time);
           });
         });
       },
@@ -155,9 +125,14 @@ module.exports = function createPlugin(app) {
       res.send(JSON.stringify(engines));
     });
     router.put('/hours', (req, res) => {
-      res.status(200).send("OK");
-      engines = req.body;
-      writeToPersistentStore(engines);
+      const newEngines = req.body;
+      if (newEngines && newEngines.paths) {
+        engines = newEngines;
+        writeToPersistentStore(engines);
+        res.status(200).send("OK");
+      } else {
+        res.status(400).send("Invalid data structure");
+      }
     });
   };
 

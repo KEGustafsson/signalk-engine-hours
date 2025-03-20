@@ -29,6 +29,7 @@
         }   
     </style>
     <title>Engine Hours Editor</title>
+    <meta name="description" content="A web application for editing engine hours data.">
     <link rel="icon" type="image/png" href="icons/icon-72x72.png">
 </head>
 
@@ -40,8 +41,8 @@
         </div>
         <div id="json-container"></div>
         <br>
-        <button id="reload-button" class="btn btn-primary">Reload Data</button>
-        <button id="save-button" class="btn btn-success" disabled>Save Changes</button>
+        <button id="reload-button" class="btn btn-primary" aria-label="Reload Data">Reload Data</button>
+        <button id="save-button" class="btn btn-success" disabled aria-label="Save Changes">Save Changes</button>
     </div>
 
     <script src="bootstrap/bootstrap.bundle.min.js"></script>
@@ -82,11 +83,11 @@
                         </div>
                         <div class="empty-row"></div>
                         <div class="input-group col-md-auto">
-                            <label class="input-group-text col-4" for="runTime${index}">propulsion.${engineName}.runTime</label>
+                            <label class="input-group-text col-4" for="runTime${index}" aria-label="Run Time for ${engineName}">propulsion.${engineName}.runTime</label>
                             <input class="input-group-text col-3" type="number" step='1.0' id="runTime${index}" value="${parseFloat(pathData.runTime/3600).toFixed(1)}">
                         </div>
                         <div class="input-group col-md-auto">
-                            <label class="input-group-text col-4" for="runTimeTrip${index}">propulsion.${engineName}.runTimeTrip</label>
+                            <label class="input-group-text col-4" for="runTimeTrip${index}" aria-label="Run Time Trip for ${engineName}">propulsion.${engineName}.runTimeTrip</label>
                             <input class="input-group-text col-3" type="number" step='1.0' id="runTimeTrip${index}" value="${parseFloat(pathData.runTimeTrip/3600).toFixed(1)}">
                         </div>
                     </div>                    
@@ -150,8 +151,20 @@
                 console.log('Data saved successfully.');
                 fetchData(); // Reload data after saving
             } catch (error) {
-                console.error(error);
+                displayErrorMessage(error.message);
             }
+        }
+
+        // Function to display error messages to the user
+        function displayErrorMessage(message) {
+            const jsonContainer = document.getElementById('json-container');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger';
+            errorDiv.textContent = message;
+            jsonContainer.prepend(errorDiv);
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
         }
 
         // Function to enable the Save button
