@@ -44,9 +44,9 @@ module.exports = function createPlugin(app) {
       context: 'vessels.self',
       subscribe: [
         {
-          path: 'propulsion.*.revolutions',
+          path: options.monitorPath ? options.monitorPath : 'propulsion.*.revolutions',
           period: options.updateRate * 1000,
-        },
+        }
       ],
     };
 
@@ -105,13 +105,14 @@ module.exports = function createPlugin(app) {
               });
               writeToPersistentStore(engines);
             }
-            if (pathObject && v.value > 0) {
+            if (pathObject && (v.value > 0 || v.value === 'started')) {
               pathObject.runTime += options.updateRate;
               pathObject.runTimeTrip += options.updateRate;
               pathObject.time = new Date().toISOString();
               writeToPersistentStore(engines);
             }
-            app.debug(engines);
+            app.debug('engines',engines);
+            // FIXME: it is possible for pathObject to be undefined when we reach the next statement
             reportData(v.path, pathObject.runTime, pathObject.runTimeTrip, pathObject.time);
           });
         });
@@ -144,11 +145,20 @@ module.exports = function createPlugin(app) {
   plugin.schema = {
     type: 'object',
     properties: {
+      monitorPath: {
+        type: 'string',
+        default: 'propulsion.*.revolutions',
+        title: 'Detect engine running by monitoring:',
+        enum: [
+          'propulsion.*.revolutions',
+          'propulsion.*.state',
+        ],
+      },
       updateRate: {
         type: 'integer',
         default: 60,
         minimum: 1,
-        title: 'How often engine revolutions is monitored. Default value is 60s',
+        title: 'How often engine revolutions/state is monitored. Default value is 60s',
       },
     },
   };
