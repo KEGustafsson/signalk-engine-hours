@@ -112,8 +112,22 @@ module.exports = function createPlugin(app) {
               writeToPersistentStore(engines);
             }
             app.debug('engines',engines);
-            // FIXME: it is possible for pathObject to be undefined when we reach the next statement
-            reportData(v.path, pathObject.runTime, pathObject.runTimeTrip, pathObject.time);
+            let runTime = 0
+            let runTimeTrip = 0
+            let logTime = 0
+            try {
+              runTime = pathObject.runTime;
+            } catch (error) {
+            }
+            try {
+              runTimeTrip = pathObject.runTimeTrip;
+            } catch (error) {
+            }
+            try {
+              logTime = pathObject.time;
+            } catch (error) {
+            }
+            reportData(v.path, runTime, runTimeTrip, logTime);
           });
         });
       },
