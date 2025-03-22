@@ -27,7 +27,7 @@ module.exports = function createPlugin(app) {
         if (data && data.engines) {
           engines = data.engines;
         } else {
-          app.error('Invalid data structure in engines.json');
+          app.debug('Invalid data structure in engines.json');
         }
         const numberEngines = Object.keys(engines.paths).length;
         app.debug("Number of engine: " + numberEngines);
@@ -37,7 +37,7 @@ module.exports = function createPlugin(app) {
         });
       })
       .catch((error) => {
-        app.error(`Error accessing engines file: ${error.message}`);
+        app.debug(`Error accessing engines file: ${error.message}`);
       });
 
     const subscription = {
@@ -88,7 +88,7 @@ module.exports = function createPlugin(app) {
       subscription,
       unsubscribes,
       (subscriptionError) => {
-        app.error(`Error: ${subscriptionError}`);
+        app.debug(`Error: ${subscriptionError}`);
       },
       (delta) => {
         if (!delta.updates) return;
