@@ -1,4 +1,4 @@
-const { readFile, writeFile, access } = require('fs/promises');
+const { readFile, writeFile, access, rename } = require('fs/promises');
 const { join } = require('path');
 
 module.exports = function createPlugin(app) {
@@ -13,7 +13,9 @@ module.exports = function createPlugin(app) {
   let enginesFile;
 
   function writeToPersistentStore(engines) {
-    return writeFile(enginesFile, JSON.stringify({ engines }), 'utf-8');
+    const tmpFile = enginesFile + '.tmp';
+    return writeFile(tmpFile, JSON.stringify({ engines }), 'utf-8')
+      .then(() => rename(tmpFile, enginesFile));
   }
 
   plugin.start = function start(options) {
