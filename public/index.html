@@ -73,7 +73,7 @@
                 const div = document.createElement('div');
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
                 const engineName = matches ? matches[1] : null;
-                if (index == 0) {
+                if (index === 0) {
                     div.innerHTML = `
                     <br>
                     <div class="row col" style="min-width: 1000px; max-width: 1200px;">
@@ -91,7 +91,7 @@
                             <input class="input-group-text col-3" type="number" step='1.0' id="runTimeTrip${index}" value="${parseFloat(pathData.runTimeTrip/3600).toFixed(1)}">
                         </div>
                     </div>                    
-                    <button id="delete-button" class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
+                    <button class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
                 `;
                 } else {
                     div.innerHTML = `
@@ -106,7 +106,7 @@
                             <input class="input-group-text col-3" type="number" id="runTimeTrip${index}" value="${parseFloat(pathData.runTimeTrip/3600).toFixed(1)}">
                         </div>
                     </div>                    
-                    <button id="delete-button" class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
+                    <button class="btn btn-danger" onclick="deleteSection(${index})">Delete</button>
                 `;
                 }
                 jsonContainer.appendChild(div);

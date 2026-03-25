@@ -29,7 +29,7 @@ module.exports = function createPlugin(app) {
         } else {
           app.debug('Invalid data structure in engines.json');
         }
-        const numberEngines = Object.keys(engines.paths).length;
+        const numberEngines = engines.paths.length;
         app.debug("Number of engine: " + numberEngines);
         app.debug(engines.paths);
         engines.paths.forEach((engine) => {
@@ -66,7 +66,8 @@ module.exports = function createPlugin(app) {
           },
         ],
       });
-      if (!Object.keys(app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta')).length) {
+      const meta = app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta');
+      if (!meta || !Object.keys(meta).length) {
         app.handleMessage(plugin.id, {
           context: `vessels.${app.selfId}`,
           updates: [
@@ -95,39 +96,25 @@ module.exports = function createPlugin(app) {
         delta.updates.forEach((u) => {
           if (!u.values) return;
           u.values.forEach((v) => {
-            const pathObject = engines.paths.find((item) => item.path === v.path);
+            let pathObject = engines.paths.find((item) => item.path === v.path);
             if (!pathObject) {
-              engines.paths.push({
+              pathObject = {
                 path: v.path,
                 runTime: 0,
                 runTimeTrip: 0,
                 time: new Date().toISOString(),
-              });
-              writeToPersistentStore(engines);
+              };
+              engines.paths.push(pathObject);
+              writeToPersistentStore(engines).catch((err) => app.debug(`Write error: ${err.message}`));
             }
-            if (pathObject && (v.value > 0 || v.value === 'started')) {
+            if (v.value > 0 || v.value === 'started') {
               pathObject.runTime += options.updateRate;
               pathObject.runTimeTrip += options.updateRate;
               pathObject.time = new Date().toISOString();
-              writeToPersistentStore(engines);
+              writeToPersistentStore(engines).catch((err) => app.debug(`Write error: ${err.message}`));
             }
-            app.debug('engines',engines);
-            let runTime = 0
-            let runTimeTrip = 0
-            let logTime = 0
-            try {
-              runTime = pathObject.runTime;
-            } catch (error) {
-            }
-            try {
-              runTimeTrip = pathObject.runTimeTrip;
-            } catch (error) {
-            }
-            try {
-              logTime = pathObject.time;
-            } catch (error) {
-            }
-            reportData(v.path, runTime, runTimeTrip, logTime);
+            app.debug('engines', engines);
+            reportData(v.path, pathObject.runTime, pathObject.runTimeTrip, pathObject.time);
           });
         });
       },
@@ -143,8 +130,12 @@ module.exports = function createPlugin(app) {
       const newEngines = req.body;
       if (newEngines && newEngines.paths) {
         engines = newEngines;
-        writeToPersistentStore(engines);
-        res.status(200).send("OK");
+        writeToPersistentStore(engines)
+          .then(() => res.status(200).send("OK"))
+          .catch((err) => {
+            app.debug(`Write error: ${err.message}`);
+            res.status(500).send("Failed to save data");
+          });
       } else {
         res.status(400).send("Invalid data structure");
       }
