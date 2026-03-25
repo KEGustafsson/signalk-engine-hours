@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "pretest": "eslint .",
-        "test": "mocha *.js"
+        "test": "mocha test/*.test.js"
     },
     "repository": {
         "type": "git",
@@ -32,6 +32,7 @@
         "eslint-config-airbnb-base": "^15.0.0",
         "eslint-plugin-import": "^2.20.0",
         "eslint-plugin-mocha": "^10.0.4",
-        "mocha": "^10.2.0"
+        "mocha": "^10.2.0",
+        "sinon": "^21.0.3"
     }
 }

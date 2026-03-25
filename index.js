@@ -16,7 +16,7 @@ module.exports = function createPlugin(app) {
   const metaPublished = new Set();
 
   function writeToPersistentStore(data) {
-    const tmpFile = enginesFile + '.tmp';
+    const tmpFile = `${enginesFile}.tmp`;
     writePromise = writePromise
       .catch(() => {})
       .then(() => writeFile(tmpFile, JSON.stringify({ engines: data }), 'utf-8'))
@@ -51,6 +51,48 @@ module.exports = function createPlugin(app) {
 
   plugin.start = function start(options) {
     enginesFile = join(app.getDataDirPath(), 'engines.json');
+
+    function reportData(skPath, runTime, runTimeTrip, logTime) {
+      const matches = skPath.match(/[^.]+\.(.+)\.[^.]+/);
+      if (!matches) {
+        app.debug(`Cannot extract engine name from path: ${skPath}`);
+        return;
+      }
+      const engineName = matches[1];
+      app.handleMessage(plugin.id, {
+        context: `vessels.${app.selfId}`,
+        updates: [
+          {
+            source: { label: plugin.id },
+            timestamp: logTime || new Date().toISOString(),
+            values: [
+              { path: `propulsion.${engineName}.runTime`, value: runTime || 0 },
+              { path: `propulsion.${engineName}.runTimeTrip`, value: runTimeTrip || 0 },
+            ],
+          },
+        ],
+      });
+      if (!metaPublished.has(engineName)) {
+        const runTimeMeta = app.getSelfPath(`propulsion.${engineName}.runTime.meta`);
+        const runTimeTripMeta = app.getSelfPath(`propulsion.${engineName}.runTimeTrip.meta`);
+        const metaUpdates = [];
+        if (!runTimeMeta || !Object.keys(runTimeMeta).length) {
+          metaUpdates.push({ path: `propulsion.${engineName}.runTime`, value: { units: 's' } });
+        }
+        if (!runTimeTripMeta || !Object.keys(runTimeTripMeta).length) {
+          metaUpdates.push({ path: `propulsion.${engineName}.runTimeTrip`, value: { units: 's' } });
+        }
+        if (metaUpdates.length) {
+          app.handleMessage(plugin.id, {
+            context: `vessels.${app.selfId}`,
+            updates: [{ meta: metaUpdates }],
+          });
+        }
+        metaPublished.add(engineName);
+      }
+      setImmediate(() => app.emit('connectionwrite', { providerId: plugin.id }));
+    }
+
     readFile(enginesFile, 'utf-8')
       .then((content) => {
         const data = JSON.parse(content);
@@ -60,7 +102,7 @@ module.exports = function createPlugin(app) {
           app.debug('Invalid data structure in engines.json');
         }
         const numberEngines = engines.paths.length;
-        app.debug("Number of engine: " + numberEngines);
+        app.debug(`Number of engine: ${numberEngines}`);
         app.debug(engines.paths);
         engines.paths.forEach((engine) => {
           reportData(engine.path, engine.runTime, engine.runTimeTrip, engine.time);
@@ -80,50 +122,9 @@ module.exports = function createPlugin(app) {
         {
           path: options.monitorPath ? options.monitorPath : 'propulsion.*.revolutions',
           period: options.updateRate * 1000,
-        }
+        },
       ],
     };
-
-    function reportData(path, runTime, runTimeTrip, logTime) {
-      const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
-      if (!matches) {
-        app.debug(`Cannot extract engine name from path: ${path}`);
-        return;
-      }
-      const engineName = matches[1];
-      app.handleMessage(plugin.id, {
-        context: `vessels.${app.selfId}`,
-        updates: [
-          {
-            source: { label: plugin.id },
-            timestamp: logTime || new Date().toISOString(),
-            values: [
-              { path: `propulsion.${engineName}.runTime`, value: runTime || 0 },
-              { path: `propulsion.${engineName}.runTimeTrip`, value: runTimeTrip || 0 },
-            ],
-          },
-        ],
-      });
-      if (!metaPublished.has(engineName)) {
-        const runTimeMeta = app.getSelfPath('propulsion.' + engineName + '.runTime.meta');
-        const runTimeTripMeta = app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta');
-        const metaUpdates = [];
-        if (!runTimeMeta || !Object.keys(runTimeMeta).length) {
-          metaUpdates.push({ path: `propulsion.${engineName}.runTime`, value: { units: "s" } });
-        }
-        if (!runTimeTripMeta || !Object.keys(runTimeTripMeta).length) {
-          metaUpdates.push({ path: `propulsion.${engineName}.runTimeTrip`, value: { units: "s" } });
-        }
-        if (metaUpdates.length) {
-          app.handleMessage(plugin.id, {
-            context: `vessels.${app.selfId}`,
-            updates: [{ meta: metaUpdates }],
-          });
-        }
-        metaPublished.add(engineName);
-      }
-      setImmediate(() => app.emit('connectionwrite', { providerId: plugin.id }));
-    }
 
     app.subscriptionmanager.subscribe(
       subscription,
@@ -172,20 +173,22 @@ module.exports = function createPlugin(app) {
         && newEngines.paths.every((p) => typeof p.path === 'string'
           && typeof p.runTime === 'number'
           && typeof p.runTimeTrip === 'number')) {
-        engines = { paths: newEngines.paths.map((p) => ({
-          path: p.path,
-          runTime: p.runTime,
-          runTimeTrip: p.runTimeTrip,
-          time: p.time || new Date().toISOString(),
-        })) };
+        engines = {
+          paths: newEngines.paths.map((p) => ({
+            path: p.path,
+            runTime: p.runTime,
+            runTimeTrip: p.runTimeTrip,
+            time: p.time || new Date().toISOString(),
+          })),
+        };
         writeToPersistentStore(engines)
-          .then(() => res.status(200).send("OK"))
+          .then(() => res.status(200).send('OK'))
           .catch((err) => {
             app.debug(`Write error: ${err.message}`);
-            res.status(500).send("Failed to save data");
+            res.status(500).send('Failed to save data');
           });
       } else {
-        res.status(400).send("Invalid data structure");
+        res.status(400).send('Invalid data structure');
       }
     });
   };
