@@ -1,4 +1,4 @@
-const { readFile, writeFile, access, rename } = require('fs/promises');
+const { readFile, writeFile, rename } = require('fs/promises');
 const { join } = require('path');
 
 module.exports = function createPlugin(app) {
@@ -9,21 +9,20 @@ module.exports = function createPlugin(app) {
 
   let engines = { paths: [] };
   let unsubscribes = [];
-  const setStatus = app.setPluginStatus || app.setProviderStatus;
   let enginesFile;
+  let writePromise = Promise.resolve();
 
   function writeToPersistentStore(engines) {
     const tmpFile = enginesFile + '.tmp';
-    return writeFile(tmpFile, JSON.stringify({ engines }), 'utf-8')
+    writePromise = writePromise
+      .then(() => writeFile(tmpFile, JSON.stringify({ engines }), 'utf-8'))
       .then(() => rename(tmpFile, enginesFile));
+    return writePromise;
   }
 
   plugin.start = function start(options) {
     enginesFile = join(app.getDataDirPath(), 'engines.json');
-    access(enginesFile)
-      .then(() => {
-        return readFile(enginesFile, 'utf-8');
-      })
+    readFile(enginesFile, 'utf-8')
       .then((content) => {
         const data = JSON.parse(content);
         if (data && data.engines) {
@@ -39,7 +38,11 @@ module.exports = function createPlugin(app) {
         });
       })
       .catch((error) => {
-        app.debug(`Error accessing engines file: ${error.message}`);
+        if (error.code === 'ENOENT') {
+          app.debug('No engines file found, starting fresh');
+        } else {
+          app.debug(`Error reading engines file: ${error.message}`);
+        }
       });
 
     const subscription = {
