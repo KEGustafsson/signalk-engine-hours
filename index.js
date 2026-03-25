@@ -11,6 +11,9 @@ module.exports = function createPlugin(app) {
   let unsubscribes = [];
   let enginesFile;
   let writePromise = Promise.resolve();
+  let writeDirty = false;
+  let writeTimer = null;
+  const metaPublished = new Set();
 
   function writeToPersistentStore(data) {
     const tmpFile = enginesFile + '.tmp';
@@ -18,6 +21,31 @@ module.exports = function createPlugin(app) {
       .catch(() => {})
       .then(() => writeFile(tmpFile, JSON.stringify({ engines: data }), 'utf-8'))
       .then(() => rename(tmpFile, enginesFile));
+    return writePromise;
+  }
+
+  function scheduleDebouncedWrite() {
+    writeDirty = true;
+    if (!writeTimer) {
+      writeTimer = setTimeout(() => {
+        writeTimer = null;
+        if (writeDirty) {
+          writeDirty = false;
+          writeToPersistentStore(engines).catch((err) => app.debug(`Write error: ${err.message}`));
+        }
+      }, 5000);
+    }
+  }
+
+  function flushWrite() {
+    if (writeTimer) {
+      clearTimeout(writeTimer);
+      writeTimer = null;
+    }
+    if (writeDirty) {
+      writeDirty = false;
+      return writeToPersistentStore(engines);
+    }
     return writePromise;
   }
 
@@ -76,20 +104,23 @@ module.exports = function createPlugin(app) {
           },
         ],
       });
-      const runTimeMeta = app.getSelfPath('propulsion.' + engineName + '.runTime.meta');
-      const runTimeTripMeta = app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta');
-      const metaUpdates = [];
-      if (!runTimeMeta || !Object.keys(runTimeMeta).length) {
-        metaUpdates.push({ path: `propulsion.${engineName}.runTime`, value: { units: "s" } });
-      }
-      if (!runTimeTripMeta || !Object.keys(runTimeTripMeta).length) {
-        metaUpdates.push({ path: `propulsion.${engineName}.runTimeTrip`, value: { units: "s" } });
-      }
-      if (metaUpdates.length) {
-        app.handleMessage(plugin.id, {
-          context: `vessels.${app.selfId}`,
-          updates: [{ meta: metaUpdates }],
-        });
+      if (!metaPublished.has(engineName)) {
+        const runTimeMeta = app.getSelfPath('propulsion.' + engineName + '.runTime.meta');
+        const runTimeTripMeta = app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta');
+        const metaUpdates = [];
+        if (!runTimeMeta || !Object.keys(runTimeMeta).length) {
+          metaUpdates.push({ path: `propulsion.${engineName}.runTime`, value: { units: "s" } });
+        }
+        if (!runTimeTripMeta || !Object.keys(runTimeTripMeta).length) {
+          metaUpdates.push({ path: `propulsion.${engineName}.runTimeTrip`, value: { units: "s" } });
+        }
+        if (metaUpdates.length) {
+          app.handleMessage(plugin.id, {
+            context: `vessels.${app.selfId}`,
+            updates: [{ meta: metaUpdates }],
+          });
+        }
+        metaPublished.add(engineName);
       }
       setImmediate(() => app.emit('connectionwrite', { providerId: plugin.id }));
     }
@@ -114,13 +145,13 @@ module.exports = function createPlugin(app) {
                 time: new Date().toISOString(),
               };
               engines.paths.push(pathObject);
-              writeToPersistentStore(engines).catch((err) => app.debug(`Write error: ${err.message}`));
+              scheduleDebouncedWrite();
             }
             if (v.value > 0 || v.value === 'started') {
               pathObject.runTime += options.updateRate;
               pathObject.runTimeTrip += options.updateRate;
               pathObject.time = new Date().toISOString();
-              writeToPersistentStore(engines).catch((err) => app.debug(`Write error: ${err.message}`));
+              scheduleDebouncedWrite();
             }
             app.debug('engines', engines);
             reportData(v.path, pathObject.runTime, pathObject.runTimeTrip, pathObject.time);
@@ -162,8 +193,10 @@ module.exports = function createPlugin(app) {
   plugin.stop = function stop() {
     unsubscribes.forEach((f) => f());
     unsubscribes = [];
+    flushWrite();
     engines = { paths: [] };
     writePromise = Promise.resolve();
+    metaPublished.clear();
   };
 
   plugin.schema = {
