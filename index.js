@@ -12,10 +12,11 @@ module.exports = function createPlugin(app) {
   let enginesFile;
   let writePromise = Promise.resolve();
 
-  function writeToPersistentStore(engines) {
+  function writeToPersistentStore(data) {
     const tmpFile = enginesFile + '.tmp';
     writePromise = writePromise
-      .then(() => writeFile(tmpFile, JSON.stringify({ engines }), 'utf-8'))
+      .catch(() => {})
+      .then(() => writeFile(tmpFile, JSON.stringify({ engines: data }), 'utf-8'))
       .then(() => rename(tmpFile, enginesFile));
     return writePromise;
   }
@@ -57,7 +58,11 @@ module.exports = function createPlugin(app) {
 
     function reportData(path, runTime, runTimeTrip, logTime) {
       const matches = path.match(/[^.]+\.(.+)\.[^.]+/);
-      const engineName = matches ? matches[1] : null;
+      if (!matches) {
+        app.debug(`Cannot extract engine name from path: ${path}`);
+        return;
+      }
+      const engineName = matches[1];
       app.handleMessage(plugin.id, {
         context: `vessels.${app.selfId}`,
         updates: [
@@ -71,20 +76,19 @@ module.exports = function createPlugin(app) {
           },
         ],
       });
-      const meta = app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta');
-      if (!meta || !Object.keys(meta).length) {
+      const runTimeMeta = app.getSelfPath('propulsion.' + engineName + '.runTime.meta');
+      const runTimeTripMeta = app.getSelfPath('propulsion.' + engineName + '.runTimeTrip.meta');
+      const metaUpdates = [];
+      if (!runTimeMeta || !Object.keys(runTimeMeta).length) {
+        metaUpdates.push({ path: `propulsion.${engineName}.runTime`, value: { units: "s" } });
+      }
+      if (!runTimeTripMeta || !Object.keys(runTimeTripMeta).length) {
+        metaUpdates.push({ path: `propulsion.${engineName}.runTimeTrip`, value: { units: "s" } });
+      }
+      if (metaUpdates.length) {
         app.handleMessage(plugin.id, {
           context: `vessels.${app.selfId}`,
-          updates: [
-            {
-              meta: [
-                {
-                  path: `propulsion.${engineName}.runTimeTrip`,
-                  value: { units: "s" },
-                },
-              ],
-            },
-          ],
+          updates: [{ meta: metaUpdates }],
         });
       }
       setImmediate(() => app.emit('connectionwrite', { providerId: plugin.id }));
@@ -133,8 +137,16 @@ module.exports = function createPlugin(app) {
     });
     router.put('/hours', (req, res) => {
       const newEngines = req.body;
-      if (newEngines && newEngines.paths) {
-        engines = newEngines;
+      if (newEngines && Array.isArray(newEngines.paths)
+        && newEngines.paths.every((p) => typeof p.path === 'string'
+          && typeof p.runTime === 'number'
+          && typeof p.runTimeTrip === 'number')) {
+        engines = { paths: newEngines.paths.map((p) => ({
+          path: p.path,
+          runTime: p.runTime,
+          runTimeTrip: p.runTimeTrip,
+          time: p.time || new Date().toISOString(),
+        })) };
         writeToPersistentStore(engines)
           .then(() => res.status(200).send("OK"))
           .catch((err) => {
@@ -150,6 +162,8 @@ module.exports = function createPlugin(app) {
   plugin.stop = function stop() {
     unsubscribes.forEach((f) => f());
     unsubscribes = [];
+    engines = { paths: [] };
+    writePromise = Promise.resolve();
   };
 
   plugin.schema = {
