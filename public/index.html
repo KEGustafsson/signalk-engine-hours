@@ -389,10 +389,9 @@
 jsonData.paths.forEach((pathData, index) => {
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
                 const rawName = matches ? matches[1] : 'unknown';
-                const safeName = escapeHtml(rawName);
                 const safeAttrName = escapeAttr(rawName);
-                const runTimeHours = parseFloat(pathData.runTime / 3600).toFixed(1);
-                const runTimeTripHours = parseFloat(pathData.runTimeTrip / 3600).toFixed(1);
+                const runTimeHours = (pathData.runTime / 3600).toFixed(2);
+                const runTimeTripHours = (pathData.runTimeTrip / 3600).toFixed(2);
 
                 const card = document.createElement('div');
                 card.className = 'engine-card';
