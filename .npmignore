@@ -5,3 +5,5 @@ jspm_packages
 .github
 .eslintrc.json
 .prettierrc.json
+.claude/
+test/
