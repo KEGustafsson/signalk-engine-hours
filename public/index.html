@@ -265,34 +265,7 @@
             opacity: 1;
         }
 
-        .header-table {
-            background: var(--light-bg);
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .header-row {
-            display: flex;
-            font-weight: 600;
-            color: var(--dark-color);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: 0.875rem;
-        }
-
-        .header-path {
-            flex: 2;
-            text-align: left;
-        }
-
-        .header-time {
-            flex: 1;
-            text-align: center;
-        }
-
-        @media (max-width: 768px) {
+@media (max-width: 768px) {
             .main-container {
                 margin: 1rem;
                 border-radius: 12px;
@@ -413,21 +386,7 @@
             const jsonContainer = document.getElementById('json-container');
             jsonContainer.innerHTML = '';
 
-            // Add header table if there are paths
-            if (jsonData.paths && jsonData.paths.length > 0) {
-                const headerDiv = document.createElement('div');
-                headerDiv.className = 'header-table';
-                headerDiv.innerHTML = `
-                    <div class="header-row">
-                        <div class="header-path">Engine Path</div>
-                        <div class="header-time">Runtime (hours)</div>
-                        <div class="header-time">Trip Runtime (hours)</div>
-                    </div>
-                `;
-                jsonContainer.appendChild(headerDiv);
-            }
-
-            jsonData.paths.forEach((pathData, index) => {
+jsonData.paths.forEach((pathData, index) => {
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
                 const rawName = matches ? matches[1] : 'unknown';
                 const safeName = escapeHtml(rawName);
