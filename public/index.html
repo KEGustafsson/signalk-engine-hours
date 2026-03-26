@@ -351,7 +351,7 @@
                     <i class="fas fa-sync-alt"></i>
                     Reload Data
                 </button>
-                <button id="save-button" class="btn-modern btn-success-modern" disabled aria-label="Save Changes">
+                <button id="save-button" class="btn-modern btn-success-modern" style="display: none;" aria-label="Save Changes">
                     <i class="fas fa-save"></i>
                     Save Changes
                 </button>
@@ -378,7 +378,9 @@
         function setButtonsEnabled(enabled) {
             document.getElementById('reload-button').disabled = !enabled;
             if (!enabled) {
-                document.getElementById('save-button').disabled = true;
+                document.getElementById('save-button').style.display = 'none';
+            } else {
+                checkChanges();
             }
         }
 
@@ -500,7 +502,7 @@
             if (!confirm(`Delete ${name}? This cannot be undone after saving.`)) return;
             jsonData.paths.splice(index, 1);
             displayJsonData();
-            document.getElementById('save-button').disabled = false;
+            document.getElementById('save-button').style.display = '';
         }
 
         // Function to send edited data back to the server using PUT
@@ -588,7 +590,7 @@
                 }
             }
 
-            saveButton.disabled = !dataChanged;
+            saveButton.style.display = dataChanged ? '' : 'none';
         }
 
         // Event listener for the Reload Data button
