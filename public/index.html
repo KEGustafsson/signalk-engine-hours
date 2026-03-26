@@ -265,34 +265,7 @@
             opacity: 1;
         }
 
-        .header-table {
-            background: var(--light-bg);
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .header-row {
-            display: flex;
-            font-weight: 600;
-            color: var(--dark-color);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: 0.875rem;
-        }
-
-        .header-path {
-            flex: 2;
-            text-align: left;
-        }
-
-        .header-time {
-            flex: 1;
-            text-align: center;
-        }
-
-        @media (max-width: 768px) {
+@media (max-width: 768px) {
             .main-container {
                 margin: 1rem;
                 border-radius: 12px;
@@ -351,7 +324,7 @@
                     <i class="fas fa-sync-alt"></i>
                     Reload Data
                 </button>
-                <button id="save-button" class="btn-modern btn-success-modern" disabled aria-label="Save Changes">
+                <button id="save-button" class="btn-modern btn-success-modern" style="display: none;" aria-label="Save Changes">
                     <i class="fas fa-save"></i>
                     Save Changes
                 </button>
@@ -378,7 +351,9 @@
         function setButtonsEnabled(enabled) {
             document.getElementById('reload-button').disabled = !enabled;
             if (!enabled) {
-                document.getElementById('save-button').disabled = true;
+                document.getElementById('save-button').style.display = 'none';
+            } else {
+                checkChanges();
             }
         }
 
@@ -411,27 +386,12 @@
             const jsonContainer = document.getElementById('json-container');
             jsonContainer.innerHTML = '';
 
-            // Add header table if there are paths
-            if (jsonData.paths && jsonData.paths.length > 0) {
-                const headerDiv = document.createElement('div');
-                headerDiv.className = 'header-table';
-                headerDiv.innerHTML = `
-                    <div class="header-row">
-                        <div class="header-path">Engine Path</div>
-                        <div class="header-time">Runtime (hours)</div>
-                        <div class="header-time">Trip Runtime (hours)</div>
-                    </div>
-                `;
-                jsonContainer.appendChild(headerDiv);
-            }
-
-            jsonData.paths.forEach((pathData, index) => {
+jsonData.paths.forEach((pathData, index) => {
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
                 const rawName = matches ? matches[1] : 'unknown';
-                const safeName = escapeHtml(rawName);
                 const safeAttrName = escapeAttr(rawName);
-                const runTimeHours = parseFloat(pathData.runTime / 3600).toFixed(1);
-                const runTimeTripHours = parseFloat(pathData.runTimeTrip / 3600).toFixed(1);
+                const runTimeHours = (pathData.runTime / 3600).toFixed(2);
+                const runTimeTripHours = (pathData.runTimeTrip / 3600).toFixed(2);
 
                 const card = document.createElement('div');
                 card.className = 'engine-card';
@@ -500,7 +460,7 @@
             if (!confirm(`Delete ${name}? This cannot be undone after saving.`)) return;
             jsonData.paths.splice(index, 1);
             displayJsonData();
-            document.getElementById('save-button').disabled = false;
+            document.getElementById('save-button').style.display = '';
         }
 
         // Function to send edited data back to the server using PUT
@@ -588,7 +548,7 @@
                 }
             }
 
-            saveButton.disabled = !dataChanged;
+            saveButton.style.display = dataChanged ? '' : 'none';
         }
 
         // Event listener for the Reload Data button

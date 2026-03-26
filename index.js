@@ -120,7 +120,7 @@ module.exports = function createPlugin(app) {
           return;
         }
         const numberEngines = engines.paths.length;
-        app.debug(`Number of engine: ${numberEngines}`);
+        app.debug(`Number of engines: ${numberEngines}`);
         app.debug(engines.paths);
         engines.paths.forEach((engine) => {
           reportData(engine.path, engine.runTime, engine.runTimeTrip, engine.time);
