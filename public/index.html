@@ -2,9 +2,14 @@
 <html lang="en">
 
 <head>
+    <title>Engine Hours Editor</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <meta name="description" content="A web application for editing engine hours data.">
+    <link rel="icon" type="image/png" href="icons/icon-72x72.png">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"
+          integrity="sha512-iecdLmaskl0HPNiecjHem/PY0MlBo28fLzir9MYgmT7PEFPx1RzEdQl+OPbzo9SMiiTFAr2+2bNjVHdaflAt2ag=="
+          crossorigin="anonymous" referrerpolicy="no-referrer">
     <style>
         :root {
             --primary-color: #2563eb;
@@ -30,7 +35,6 @@
             box-shadow: var(--card-shadow);
             margin: 2rem auto;
             max-width: 1200px;
-            min-width: 480px;
             overflow: hidden;
         }
 
@@ -124,13 +128,14 @@
 
         .metric-input {
             width: 100%;
-            padding: 0.75rem 1rem;
+            padding: 0.75rem 3.5rem 0.75rem 1rem;
             border: 2px solid #e2e8f0;
             border-radius: 8px;
             font-size: 1.125rem;
             font-weight: 500;
             transition: all 0.3s ease;
             background: white;
+            box-sizing: border-box;
         }
 
         .metric-input:focus {
@@ -165,6 +170,7 @@
             border-radius: 6px;
             font-size: 0.875rem;
             font-weight: 500;
+            cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -190,6 +196,7 @@
             border-radius: 8px;
             font-weight: 600;
             font-size: 0.95rem;
+            cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -232,12 +239,30 @@
             padding: 1rem 1.5rem;
             margin-bottom: 1rem;
             box-shadow: var(--card-shadow);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .alert-danger-modern {
             background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
             color: var(--danger-color);
             border-left: 4px solid var(--danger-color);
+        }
+
+        .alert-dismiss {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: var(--danger-color);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 0.25rem;
+            opacity: 0.7;
+        }
+
+        .alert-dismiss:hover {
+            opacity: 1;
         }
 
         .header-table {
@@ -310,9 +335,6 @@
             100% { transform: rotate(360deg); }
         }
     </style>
-    <title>Engine Hours Editor</title>
-    <meta name="description" content="A web application for editing engine hours data.">
-    <link rel="icon" type="image/png" href="icons/icon-72x72.png">
 </head>
 
 <body>
@@ -322,6 +344,7 @@
             <h1>Engine Hours Editor</h1>
         </div>
         <div class="content-area">
+            <div id="error-container" role="alert" aria-live="polite"></div>
             <div id="json-container"></div>
             <div class="action-buttons">
                 <button id="reload-button" class="btn-modern btn-primary-modern" aria-label="Reload Data">
@@ -339,18 +362,47 @@
     <script>
         const url = window.location.origin + '/plugins/signalk-engine-hours/hours';
         let jsonData = null;
+        let isSaving = false;
+        let isFetching = false;
+
+        function escapeAttr(str) {
+            return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function setButtonsEnabled(enabled) {
+            document.getElementById('reload-button').disabled = !enabled;
+            if (!enabled) {
+                document.getElementById('save-button').disabled = true;
+            }
+        }
 
         // Function to fetch JSON data from the server
         async function fetchData() {
+            if (isFetching) return;
+            isFetching = true;
+            setButtonsEnabled(false);
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 jsonData = await response.json();
+                if (!jsonData || !Array.isArray(jsonData.paths)) {
+                    jsonData = { paths: [] };
+                    displayErrorMessage('Invalid data received from server');
+                }
                 displayJsonData();
             } catch (error) {
-                console.error(error);
+                displayErrorMessage(error.message);
+            } finally {
+                isFetching = false;
+                setButtonsEnabled(true);
             }
         }
 
@@ -374,71 +426,101 @@
             }
 
             jsonData.paths.forEach((pathData, index) => {
-                const div = document.createElement('div');
                 const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
-                const engineName = matches ? matches[1] : null;
-                
-                div.className = 'engine-card';
-                div.innerHTML = `
-                    <div class="engine-header">
-                        <div class="engine-name">
-                            <i class="fas fa-cog"></i>
-                            propulsion.${engineName}
-                        </div>
-                        <button class="delete-btn" onclick="deleteSection(${index})">
-                            <i class="fas fa-trash"></i>
-                            Delete
-                        </button>
-                    </div>
-                    <div class="engine-body">
-                        <div class="metric-row">
-                            <div class="metric-group">
-                                <label class="metric-label" for="runTime${index}">Total Runtime</label>
-                                <div class="metric-wrapper">
-                                    <input class="metric-input" type="number" step="1.0" id="runTime${index}" 
-                                           value="${parseFloat(pathData.runTime/3600).toFixed(1)}" 
-                                           aria-label="Total Runtime for ${engineName}">
-                                    <span class="metric-unit">hours</span>
-                                </div>
+                const rawName = matches ? matches[1] : 'unknown';
+                const safeName = escapeHtml(rawName);
+                const safeAttrName = escapeAttr(rawName);
+                const runTimeHours = parseFloat(pathData.runTime / 3600).toFixed(1);
+                const runTimeTripHours = parseFloat(pathData.runTimeTrip / 3600).toFixed(1);
+
+                const card = document.createElement('div');
+                card.className = 'engine-card';
+
+                // Build header
+                const headerEl = document.createElement('div');
+                headerEl.className = 'engine-header';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'engine-name';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-cog';
+                nameEl.appendChild(icon);
+                nameEl.appendChild(document.createTextNode(' propulsion.' + rawName));
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                deleteBtn.addEventListener('click', () => deleteSection(index));
+
+                headerEl.appendChild(nameEl);
+                headerEl.appendChild(deleteBtn);
+                card.appendChild(headerEl);
+
+                // Build body with inputs
+                const bodyEl = document.createElement('div');
+                bodyEl.className = 'engine-body';
+                bodyEl.innerHTML = `
+                    <div class="metric-row">
+                        <div class="metric-group">
+                            <label class="metric-label" for="runTime${index}">Total Runtime</label>
+                            <div class="metric-wrapper">
+                                <input class="metric-input" type="number" step="1.0" min="0"
+                                       id="runTime${index}"
+                                       data-path-index="${index}" data-field="runTime"
+                                       value="${runTimeHours}"
+                                       aria-label="Total Runtime for ${safeAttrName}">
+                                <span class="metric-unit">hours</span>
                             </div>
-                            <div class="metric-group">
-                                <label class="metric-label" for="runTimeTrip${index}">Trip Runtime</label>
-                                <div class="metric-wrapper">
-                                    <input class="metric-input" type="number" step="1.0" id="runTimeTrip${index}" 
-                                           value="${parseFloat(pathData.runTimeTrip/3600).toFixed(1)}" 
-                                           aria-label="Trip Runtime for ${engineName}">
-                                    <span class="metric-unit">hours</span>
-                                </div>
+                        </div>
+                        <div class="metric-group">
+                            <label class="metric-label" for="runTimeTrip${index}">Trip Runtime</label>
+                            <div class="metric-wrapper">
+                                <input class="metric-input" type="number" step="1.0" min="0"
+                                       id="runTimeTrip${index}"
+                                       data-path-index="${index}" data-field="runTimeTrip"
+                                       value="${runTimeTripHours}"
+                                       aria-label="Trip Runtime for ${safeAttrName}">
+                                <span class="metric-unit">hours</span>
                             </div>
                         </div>
                     </div>
                 `;
-                jsonContainer.appendChild(div);
+                card.appendChild(bodyEl);
+                jsonContainer.appendChild(card);
             });
 
-            checkChanges(); // Enable/disable the Save button after rendering
+            checkChanges();
         }
 
         // Function to delete a section from the JSON data
         function deleteSection(index) {
-            if (jsonData.paths.length > index) {
-                jsonData.paths.splice(index, 1);
-                displayJsonData();
-                enableSaveButton(); // Explicitly enable the Save button
-            }
+            if (jsonData.paths.length <= index) return;
+            const matches = jsonData.paths[index].path.match(/[^.]+\.(.+)\.[^.]+/);
+            const name = matches ? matches[1] : 'this engine';
+            if (!confirm(`Delete ${name}? This cannot be undone after saving.`)) return;
+            jsonData.paths.splice(index, 1);
+            displayJsonData();
+            document.getElementById('save-button').disabled = false;
         }
 
         // Function to send edited data back to the server using PUT
         async function saveChanges() {
+            if (isSaving) return;
+            isSaving = true;
+            setButtonsEnabled(false);
             try {
-                // Update jsonData with modified values from input fields
-                const inputs = document.querySelectorAll('input[type="number"]');
+                // Update jsonData with modified values from input fields using data attributes
+                const inputs = document.querySelectorAll('input[data-path-index][data-field]');
                 for (let i = 0; i < inputs.length; i++) {
+                    const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
+                    const field = inputs[i].dataset.field;
                     const inputValue = parseFloat(inputs[i].value);
-                    if (i % 2 === 0) {
-                        jsonData.paths[Math.floor(i / 2)].runTime = parseInt(inputValue* 3600);
-                    } else {
-                        jsonData.paths[Math.floor(i / 2)].runTimeTrip = parseInt(inputValue * 3600);
+                    if (isNaN(inputValue) || inputValue < 0) {
+                        displayErrorMessage(`Invalid value for ${field} at engine ${pathIndex + 1}. Must be a non-negative number.`);
+                        return;
+                    }
+                    if (field === 'runTime' || field === 'runTimeTrip') {
+                        jsonData.paths[pathIndex][field] = Math.round(inputValue * 3600);
                     }
                 }
 
@@ -447,57 +529,60 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(jsonData) // Send the entire edited JSON data
+                    body: JSON.stringify(jsonData)
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
-                console.log('Data saved successfully.');
-                fetchData(); // Reload data after saving
+                fetchData();
             } catch (error) {
                 displayErrorMessage(error.message);
+            } finally {
+                isSaving = false;
+                setButtonsEnabled(true);
             }
         }
 
         // Function to display error messages to the user
         function displayErrorMessage(message) {
-            const jsonContainer = document.getElementById('json-container');
+            const errorContainer = document.getElementById('error-container');
             const errorDiv = document.createElement('div');
             errorDiv.className = 'alert-modern alert-danger-modern';
-            errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
-            jsonContainer.prepend(errorDiv);
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = message;
+            errorDiv.appendChild(textSpan);
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.className = 'alert-dismiss';
+            dismissBtn.innerHTML = '&times;';
+            dismissBtn.setAttribute('aria-label', 'Dismiss error');
+            dismissBtn.addEventListener('click', () => errorDiv.remove());
+            errorDiv.appendChild(dismissBtn);
+
+            errorContainer.appendChild(errorDiv);
             setTimeout(() => {
-                errorDiv.remove();
-            }, 5000);
-        }
-
-        // Function to enable the Save button
-        function enableSaveButton() {
-            const saveButton = document.getElementById('save-button');
-            saveButton.disabled = false;
-        }
-
-        // Function to disable the Save button
-        function disableSaveButton() {
-            const saveButton = document.getElementById('save-button');
-            saveButton.disabled = true;
+                if (errorDiv.parentNode) errorDiv.remove();
+            }, 8000);
         }
 
         // Function to check if any values have changed and enable/disable the Save button accordingly
         function checkChanges() {
             const saveButton = document.getElementById('save-button');
-            const inputs = document.querySelectorAll('input[type="number"]');
+            const inputs = document.querySelectorAll('input[data-path-index][data-field]');
             let dataChanged = false;
 
             for (let i = 0; i < inputs.length; i++) {
-                const inputValue = parseInt(parseFloat(inputs[i].value) * 3600);
-                let originalValue;
-                if (i % 2 === 0) {
-                    originalValue = jsonData.paths[Math.floor(i / 2)].runTime;
-                } else {
-                    originalValue = jsonData.paths[Math.floor(i / 2)].runTimeTrip;
+                const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
+                const field = inputs[i].dataset.field;
+                const inputValue = parseFloat(inputs[i].value);
+                if (isNaN(inputValue)) {
+                    dataChanged = true;
+                    break;
                 }
-                if (inputValue !== originalValue) {
+                const convertedValue = Math.round(inputValue * 3600);
+                const originalValue = jsonData.paths[pathIndex][field];
+                if (convertedValue !== originalValue) {
                     dataChanged = true;
                     break;
                 }
