@@ -540,9 +540,8 @@ jsonData.paths.forEach((pathData, index) => {
                     dataChanged = true;
                     break;
                 }
-                const convertedValue = Math.round(inputValue * 3600);
-                const originalValue = jsonData.paths[pathIndex][field];
-                if (convertedValue !== originalValue) {
+                const originalDisplayed = parseFloat((jsonData.paths[pathIndex][field] / 3600).toFixed(2));
+                if (inputValue !== originalDisplayed) {
                     dataChanged = true;
                     break;
                 }
