@@ -168,7 +168,7 @@ describe('signalk-engine-hours plugin', function () {
       plugin.start(defaultOptions);
       await new Promise((r) => setTimeout(r, 100));
 
-      assert.ok(app.debug.calledWith('Number of engine: 0'));
+      assert.ok(app.debug.calledWith('Number of engines: 0'));
       assert.ok(!app.handleMessage.called);
     });
 
