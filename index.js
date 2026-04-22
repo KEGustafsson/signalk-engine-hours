@@ -109,6 +109,7 @@ module.exports = function createPlugin(app) {
                 path: typeof p.path === 'string' ? p.path : '',
                 runTime: sanitizeNumber(p.runTime, 0),
                 runTimeTrip: sanitizeNumber(p.runTimeTrip, 0),
+                running: p.running || false,
                 time: p.time || new Date().toISOString(),
               })),
             };
@@ -140,6 +141,7 @@ module.exports = function createPlugin(app) {
         {
           path: options.monitorPath ? options.monitorPath : 'propulsion.*.revolutions',
           period: updateRate * 1000,
+          policy: 'fixed',
         },
       ],
     };
@@ -155,24 +157,55 @@ module.exports = function createPlugin(app) {
         delta.updates.forEach((u) => {
           if (!u.values) return;
           u.values.forEach((v) => {
-            let pathObject = engines.paths.find((item) => item.path === v.path);
-            if (!pathObject) {
-              pathObject = {
+            let engine = engines.paths.find((item) => item.path === v.path);
+            const running = v.value > 0 || v.value === 'started';
+            const now = new Date();
+
+            // new engine
+            if (!engine) {
+              app.debug('new engine');
+              engine = {
                 path: v.path,
                 runTime: 0,
                 runTimeTrip: 0,
-                time: new Date().toISOString(),
+                running,
               };
-              engines.paths.push(pathObject);
-              scheduleDebouncedWrite();
+              engines.paths.push(engine);
             }
-            if (v.value > 0 || v.value === 'started') {
-              pathObject.runTime += updateRate;
-              pathObject.runTimeTrip += updateRate;
-              pathObject.time = new Date().toISOString();
-              scheduleDebouncedWrite();
+
+            // stopped > stopped
+            //    do nothing
+            else if (!engine.running && !running) {
+              app.debug('stopped - so doing nothing');
+              return;
             }
-            reportData(v.path, pathObject.runTime, pathObject.runTimeTrip, pathObject.time);
+
+            // stopped > running
+            //    record running = T
+            else if (!engine.running && running) {
+              app.debug('started');
+              engine.running = true;
+            }
+
+            // running > running
+            //    record ++hours
+            else if (engine.running && running) {
+              app.debug('running');
+              const ellapsed = (now - new Date(engine.time)) / 1000;
+              engine.runTime += ellapsed;
+              engine.runTimeTrip += ellapsed;
+            }
+
+            // running > stopped
+            //    record running = F
+            else if (engine.running && !running) {
+              app.debug('stopping');
+              engine.running = false;
+            }
+
+            engine.time = now.toISOString();
+            scheduleDebouncedWrite();
+            reportData(v.path, engine.runTime, engine.runTimeTrip, engine.time);
           });
         });
       },
@@ -195,6 +228,7 @@ module.exports = function createPlugin(app) {
             path: p.path,
             runTime: p.runTime,
             runTimeTrip: p.runTimeTrip,
+            running: p.running,
             time: (typeof p.time === 'string' && !Number.isNaN(Date.parse(p.time)))
               ? p.time : new Date().toISOString(),
           })),
