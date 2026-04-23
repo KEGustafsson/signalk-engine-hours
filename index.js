@@ -163,12 +163,10 @@ module.exports = function createPlugin(app) {
 
             // new engine
             if (!engine) {
-              app.debug('new engine');
               engine = {
                 path: v.path,
                 runTime: 0,
                 runTimeTrip: 0,
-                running,
               };
               engines.paths.push(engine);
             }
@@ -176,33 +174,18 @@ module.exports = function createPlugin(app) {
             // stopped > stopped
             //    do nothing
             else if (!engine.running && !running) {
-              app.debug('stopped - so doing nothing');
               return;
-            }
-
-            // stopped > running
-            //    record running = T
-            else if (!engine.running && running) {
-              app.debug('started');
-              engine.running = true;
             }
 
             // running > running
             //    record ++hours
             else if (engine.running && running) {
-              app.debug('running');
               const ellapsed = (now - new Date(engine.time)) / 1000;
               engine.runTime += ellapsed;
               engine.runTimeTrip += ellapsed;
             }
 
-            // running > stopped
-            //    record running = F
-            else if (engine.running && !running) {
-              app.debug('stopping');
-              engine.running = false;
-            }
-
+            engine.running = running;
             engine.time = now.toISOString();
             scheduleDebouncedWrite();
             reportData(v.path, engine.runTime, engine.runTimeTrip, engine.time);
