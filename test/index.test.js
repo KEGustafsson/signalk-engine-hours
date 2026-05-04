@@ -12,13 +12,26 @@ describe('signalk-engine-hours plugin', function () {
   let errorCallback;
   let tmpDir;
   let clock;
-  const defaultOptions = { updateRate: 60, monitorPath: 'propulsion.*.revolutions' };
+  const defaultOptions = {
+    updateRate: 60,
+    monitorPath: 'propulsion.*.revolutions',
+  };
 
-  function makeDelta(pathStr, value) {
+  const BASE_TIME = '2024-06-01T00:00:00.000Z';
+  const baseMs = Date.parse(BASE_TIME);
+
+  function ts(offsetSec) {
+    return new Date(baseMs + offsetSec * 1000).toISOString();
+  }
+
+  function makeDelta(pathStr, value, timestamp) {
     return {
-      updates: [{
-        values: [{ path: pathStr, value }],
-      }],
+      updates: [
+        {
+          timestamp: timestamp || new Date().toISOString(),
+          values: [{ path: pathStr, value }],
+        },
+      ],
     };
   }
 
@@ -100,23 +113,29 @@ describe('signalk-engine-hours plugin', function () {
       const call = app.subscriptionmanager.subscribe.getCall(0);
       assert.equal(call.args[0].subscribe[0].period, 60000);
 
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
-      const msg = app.handleMessage.getCall(0).args[1];
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
+      const msg = app.handleMessage.lastCall.args[1];
       assert.equal(msg.updates[0].values[0].value, 60);
     });
 
     it('should load existing engines from file on start', async function () {
       const existingData = {
         engines: {
-          paths: [{
-            path: 'propulsion.main.revolutions',
-            runTime: 3600,
-            runTimeTrip: 1800,
-            time: '2024-01-01T00:00:00.000Z',
-          }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: 3600,
+              runTimeTrip: 1800,
+              time: '2024-01-01T00:00:00.000Z',
+            },
+          ],
         },
       };
-      await fs.writeFile(path.join(tmpDir, 'engines.json'), JSON.stringify(existingData));
+      await fs.writeFile(
+        path.join(tmpDir, 'engines.json'),
+        JSON.stringify(existingData),
+      );
 
       plugin.start(defaultOptions);
       // Wait for async file read
@@ -136,7 +155,10 @@ describe('signalk-engine-hours plugin', function () {
     });
 
     it('should handle corrupted JSON in engines file', async function () {
-      await fs.writeFile(path.join(tmpDir, 'engines.json'), 'not valid json{{{');
+      await fs.writeFile(
+        path.join(tmpDir, 'engines.json'),
+        'not valid json{{{',
+      );
 
       plugin.start(defaultOptions);
       await new Promise((r) => setTimeout(r, 100));
@@ -145,7 +167,10 @@ describe('signalk-engine-hours plugin', function () {
     });
 
     it('should handle invalid data structure in engines file', async function () {
-      await fs.writeFile(path.join(tmpDir, 'engines.json'), JSON.stringify({ foo: 'bar' }));
+      await fs.writeFile(
+        path.join(tmpDir, 'engines.json'),
+        JSON.stringify({ foo: 'bar' }),
+      );
 
       plugin.start(defaultOptions);
       await new Promise((r) => setTimeout(r, 100));
@@ -154,7 +179,10 @@ describe('signalk-engine-hours plugin', function () {
     });
 
     it('should handle engines file with non-array paths', async function () {
-      await fs.writeFile(path.join(tmpDir, 'engines.json'), JSON.stringify({ engines: { paths: 'not-array' } }));
+      await fs.writeFile(
+        path.join(tmpDir, 'engines.json'),
+        JSON.stringify({ engines: { paths: 'not-array' } }),
+      );
 
       plugin.start(defaultOptions);
       await new Promise((r) => setTimeout(r, 100));
@@ -163,7 +191,10 @@ describe('signalk-engine-hours plugin', function () {
     });
 
     it('should handle engines file with empty paths array', async function () {
-      await fs.writeFile(path.join(tmpDir, 'engines.json'), JSON.stringify({ engines: { paths: [] } }));
+      await fs.writeFile(
+        path.join(tmpDir, 'engines.json'),
+        JSON.stringify({ engines: { paths: [] } }),
+      );
 
       plugin.start(defaultOptions);
       await new Promise((r) => setTimeout(r, 100));
@@ -175,15 +206,20 @@ describe('signalk-engine-hours plugin', function () {
     it('should sanitize NaN/negative values loaded from file', async function () {
       const badData = {
         engines: {
-          paths: [{
-            path: 'propulsion.main.revolutions',
-            runTime: NaN,
-            runTimeTrip: -100,
-            time: '2024-01-01T00:00:00.000Z',
-          }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: NaN,
+              runTimeTrip: -100,
+              time: '2024-01-01T00:00:00.000Z',
+            },
+          ],
         },
       };
-      await fs.writeFile(path.join(tmpDir, 'engines.json'), JSON.stringify(badData));
+      await fs.writeFile(
+        path.join(tmpDir, 'engines.json'),
+        JSON.stringify(badData),
+      );
 
       plugin.start(defaultOptions);
       await new Promise((r) => setTimeout(r, 100));
@@ -199,44 +235,52 @@ describe('signalk-engine-hours plugin', function () {
       plugin.start(defaultOptions);
     });
 
-    it('should register a new engine on first delta', function () {
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
+    it('should register a new engine on first delta without accruing time', function () {
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
 
       assert.ok(app.handleMessage.called);
       const msg = app.handleMessage.getCall(0).args[1];
       const values = msg.updates[0].values;
       assert.equal(values[0].path, 'propulsion.main.runTime');
-      assert.equal(values[0].value, 60);
+      assert.equal(values[0].value, 0);
       assert.equal(values[1].path, 'propulsion.main.runTimeTrip');
-      assert.equal(values[1].value, 60);
+      assert.equal(values[1].value, 0);
     });
 
     it('should accumulate time on subsequent deltas', function () {
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
-      deltaCallback(makeDelta('propulsion.main.revolutions', 200));
-      deltaCallback(makeDelta('propulsion.main.revolutions', 150));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 200, ts(60)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 150, ts(120)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 150, ts(180)));
 
-      // 3 deltas x 60s updateRate = 180s
+      // 4 deltas spaced 60s apart -> 3 spans of 60s = 180s
       const lastCall = app.handleMessage.lastCall.args[1];
       assert.equal(lastCall.updates[0].values[0].value, 180);
       assert.equal(lastCall.updates[0].values[1].value, 180);
     });
 
     it('should not accumulate time when value is 0 (engine stopped)', function () {
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
-      deltaCallback(makeDelta('propulsion.main.revolutions', 0));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(120)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 0, ts(180)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 0, ts(240)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 0, ts(300)));
 
-      // First delta: 60s, second delta: engine stopped, still 60s
-      const calls = app.handleMessage.getCalls()
+      // Spans where prev was running: 0->60, 60->120, 120->180 (engine stops at end)
+      // = 3 * 60 = 180s. Spans 180->240 and 240->300 do not accrue (prev !running).
+      const calls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].values);
       const lastMsg = calls[calls.length - 1].args[1];
-      assert.equal(lastMsg.updates[0].values[0].value, 60);
+      assert.equal(lastMsg.updates[0].values[0].value, 180);
     });
 
     it('should still report data when value is 0 (just no accumulation)', function () {
-      deltaCallback(makeDelta('propulsion.main.revolutions', 0));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 0, ts(0)));
 
-      const calls = app.handleMessage.getCalls()
+      const calls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].values);
       assert.equal(calls.length, 1);
       assert.equal(calls[0].args[1].updates[0].values[0].value, 0);
@@ -246,53 +290,79 @@ describe('signalk-engine-hours plugin', function () {
       plugin.stop();
       plugin.start({ updateRate: 30, monitorPath: 'propulsion.*.state' });
 
-      deltaCallback(makeDelta('propulsion.port.state', 'started'));
-      deltaCallback(makeDelta('propulsion.port.state', 'stopped'));
-      deltaCallback(makeDelta('propulsion.port.state', 'standby'));
+      deltaCallback(makeDelta('propulsion.port.state', 'started', ts(0)));
+      deltaCallback(makeDelta('propulsion.port.state', 'started', ts(30)));
+      deltaCallback(makeDelta('propulsion.port.state', 'stopped', ts(60)));
+      deltaCallback(makeDelta('propulsion.port.state', 'standby', ts(90)));
 
-      const calls = app.handleMessage.getCalls()
+      const calls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].values);
       const lastMsg = calls[calls.length - 1].args[1];
-      // Only the first 'started' delta should accumulate: 30s
-      assert.equal(lastMsg.updates[0].values[0].value, 30);
+      // started->started: 30s accrue, started->stopped: 30s accrue, stopped->standby: no accrue
+      assert.equal(lastMsg.updates[0].values[0].value, 60);
     });
 
     it('should handle state-based monitoring (value = "started")', function () {
       plugin.stop();
       plugin.start({ updateRate: 30, monitorPath: 'propulsion.*.state' });
 
-      deltaCallback(makeDelta('propulsion.port.state', 'started'));
+      deltaCallback(makeDelta('propulsion.port.state', 'started', ts(0)));
+      deltaCallback(makeDelta('propulsion.port.state', 'started', ts(30)));
 
-      const msg = app.handleMessage.getCall(0).args[1];
+      const msg = app.handleMessage.lastCall.args[1];
       assert.equal(msg.updates[0].values[0].path, 'propulsion.port.runTime');
       assert.equal(msg.updates[0].values[0].value, 30);
     });
 
     it('should not accumulate time for negative values', function () {
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
-      deltaCallback(makeDelta('propulsion.main.revolutions', -50));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', -50, ts(120)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', -50, ts(180)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', -50, ts(240)));
 
-      const calls = app.handleMessage.getCalls()
+      // Spans where prev was running: 0->60, 60->120 (engine becomes !running at -50)
+      // = 2 * 60 = 120s. Spans 120->180, 180->240 do not accrue (prev !running).
+      const calls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].values);
       const lastMsg = calls[calls.length - 1].args[1];
-      assert.equal(lastMsg.updates[0].values[0].value, 60);
+      assert.equal(lastMsg.updates[0].values[0].value, 120);
     });
 
     it('should track multiple engines independently', function () {
-      deltaCallback(makeDelta('propulsion.port.revolutions', 100));
-      deltaCallback(makeDelta('propulsion.starboard.revolutions', 200));
-      deltaCallback(makeDelta('propulsion.port.revolutions', 150));
+      deltaCallback(makeDelta('propulsion.port.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.starboard.revolutions', 200, ts(0)));
+      deltaCallback(makeDelta('propulsion.port.revolutions', 150, ts(60)));
+      deltaCallback(makeDelta('propulsion.starboard.revolutions', 250, ts(60)));
+      deltaCallback(makeDelta('propulsion.port.revolutions', 200, ts(120)));
 
-      // port: 2 updates x 60s = 120s
-      // starboard: 1 update x 60s = 60s
-      const calls = app.handleMessage.getCalls()
+      // port: 3 deltas, 2 spans -> 120s
+      // starboard: 2 deltas, 1 span -> 60s
+      const calls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].values);
 
-      const portCalls = calls.filter((c) => c.args[1].updates[0].values[0].path === 'propulsion.port.runTime');
-      const starboardCalls = calls.filter((c) => c.args[1].updates[0].values[0].path === 'propulsion.starboard.runTime');
+      const portCalls = calls.filter(
+        (c) =>
+          c.args[1].updates[0].values[0].path === 'propulsion.port.runTime',
+      );
+      const starboardCalls = calls.filter(
+        (c) =>
+          c.args[1].updates[0].values[0].path ===
+          'propulsion.starboard.runTime',
+      );
 
-      assert.equal(portCalls[portCalls.length - 1].args[1].updates[0].values[0].value, 120);
-      assert.equal(starboardCalls[starboardCalls.length - 1].args[1].updates[0].values[0].value, 60);
+      assert.equal(
+        portCalls[portCalls.length - 1].args[1].updates[0].values[0].value,
+        120,
+      );
+      assert.equal(
+        starboardCalls[starboardCalls.length - 1].args[1].updates[0].values[0]
+          .value,
+        60,
+      );
     });
 
     it('should skip deltas with no updates', function () {
@@ -312,7 +382,8 @@ describe('signalk-engine-hours plugin', function () {
 
       assert.ok(app.debug.calledWithMatch(/Cannot extract engine name/));
       // handleMessage should not be called for data (meta check won't happen either)
-      const dataCalls = app.handleMessage.getCalls()
+      const dataCalls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].values);
       assert.equal(dataCalls.length, 0);
     });
@@ -322,7 +393,9 @@ describe('signalk-engine-hours plugin', function () {
 
       // connectionwrite is emitted via setImmediate, so check on next tick
       setImmediate(() => {
-        assert.ok(app.emit.calledWith('connectionwrite', { providerId: plugin.id }));
+        assert.ok(
+          app.emit.calledWith('connectionwrite', { providerId: plugin.id }),
+        );
         done();
       });
     });
@@ -345,7 +418,8 @@ describe('signalk-engine-hours plugin', function () {
     it('should publish meta with units on first report', function () {
       deltaCallback(makeDelta('propulsion.main.revolutions', 100));
 
-      const metaCalls = app.handleMessage.getCalls()
+      const metaCalls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].meta);
       assert.equal(metaCalls.length, 1);
 
@@ -361,7 +435,8 @@ describe('signalk-engine-hours plugin', function () {
       deltaCallback(makeDelta('propulsion.main.revolutions', 100));
       deltaCallback(makeDelta('propulsion.main.revolutions', 200));
 
-      const metaCalls = app.handleMessage.getCalls()
+      const metaCalls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].meta);
       assert.equal(metaCalls.length, 1);
     });
@@ -370,19 +445,23 @@ describe('signalk-engine-hours plugin', function () {
       deltaCallback(makeDelta('propulsion.port.revolutions', 100));
       deltaCallback(makeDelta('propulsion.starboard.revolutions', 100));
 
-      const metaCalls = app.handleMessage.getCalls()
+      const metaCalls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].meta);
       assert.equal(metaCalls.length, 2);
     });
 
     it('should skip meta if already present in SignalK', function () {
       app.getSelfPath
-        .withArgs('propulsion.main.runTime.meta').returns({ units: 's' })
-        .withArgs('propulsion.main.runTimeTrip.meta').returns({ units: 's' });
+        .withArgs('propulsion.main.runTime.meta')
+        .returns({ units: 's' })
+        .withArgs('propulsion.main.runTimeTrip.meta')
+        .returns({ units: 's' });
 
       deltaCallback(makeDelta('propulsion.main.revolutions', 100));
 
-      const metaCalls = app.handleMessage.getCalls()
+      const metaCalls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].meta);
       assert.equal(metaCalls.length, 0);
     });
@@ -391,13 +470,17 @@ describe('signalk-engine-hours plugin', function () {
   describe('persistence', function () {
     it('should write engines to disk after debounce', async function () {
       plugin.start(defaultOptions);
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
 
       // Force flush
       plugin.stop();
       await new Promise((r) => setTimeout(r, 200));
 
-      const content = await fs.readFile(path.join(tmpDir, 'engines.json'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(tmpDir, 'engines.json'),
+        'utf-8',
+      );
       const data = JSON.parse(content);
       assert.ok(data.engines);
       assert.ok(data.engines.paths);
@@ -420,17 +503,21 @@ describe('signalk-engine-hours plugin', function () {
 
     it('should debounce multiple rapid updates into one write', async function () {
       plugin.start(defaultOptions);
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
-      deltaCallback(makeDelta('propulsion.main.revolutions', 200));
-      deltaCallback(makeDelta('propulsion.main.revolutions', 300));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 200, ts(60)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 300, ts(120)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 300, ts(180)));
 
       // Flush writes and wait for completion
       plugin.stop();
       await new Promise((r) => setTimeout(r, 200));
 
-      // Verify the file has the final accumulated value (3 x 60 = 180),
+      // Verify the file has the final accumulated value (3 spans x 60s = 180s),
       // proving all updates were coalesced into one write
-      const content = await fs.readFile(path.join(tmpDir, 'engines.json'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(tmpDir, 'engines.json'),
+        'utf-8',
+      );
       const data = JSON.parse(content);
       assert.equal(data.engines.paths[0].runTime, 180);
     });
@@ -442,8 +529,12 @@ describe('signalk-engine-hours plugin', function () {
     beforeEach(function () {
       routes = {};
       const router = {
-        get: (p, handler) => { routes[`GET ${p}`] = handler; },
-        put: (p, handler) => { routes[`PUT ${p}`] = handler; },
+        get: (p, handler) => {
+          routes[`GET ${p}`] = handler;
+        },
+        put: (p, handler) => {
+          routes[`PUT ${p}`] = handler;
+        },
       };
       plugin.start(defaultOptions);
       plugin.registerWithRouter(router);
@@ -455,7 +546,8 @@ describe('signalk-engine-hours plugin', function () {
     });
 
     it('GET /hours should return current engines data', function () {
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
 
       const res = {
         json: sinon.stub(),
@@ -471,12 +563,14 @@ describe('signalk-engine-hours plugin', function () {
     it('PUT /hours should update engines with valid data', async function () {
       const req = {
         body: {
-          paths: [{
-            path: 'propulsion.main.revolutions',
-            runTime: 7200,
-            runTimeTrip: 3600,
-            time: '2024-06-01T00:00:00.000Z',
-          }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: 7200,
+              runTimeTrip: 3600,
+              time: '2024-06-01T00:00:00.000Z',
+            },
+          ],
         },
       };
       const res = {
@@ -534,7 +628,13 @@ describe('signalk-engine-hours plugin', function () {
     it('PUT /hours should reject NaN values', function () {
       const req = {
         body: {
-          paths: [{ path: 'propulsion.main.revolutions', runTime: NaN, runTimeTrip: 0 }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: NaN,
+              runTimeTrip: 0,
+            },
+          ],
         },
       };
       const res = {
@@ -548,7 +648,13 @@ describe('signalk-engine-hours plugin', function () {
     it('PUT /hours should reject negative values', function () {
       const req = {
         body: {
-          paths: [{ path: 'propulsion.main.revolutions', runTime: -100, runTimeTrip: 0 }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: -100,
+              runTimeTrip: 0,
+            },
+          ],
         },
       };
       const res = {
@@ -576,12 +682,14 @@ describe('signalk-engine-hours plugin', function () {
     it('PUT /hours should reject invalid time string', async function () {
       const req = {
         body: {
-          paths: [{
-            path: 'propulsion.main.revolutions',
-            runTime: 100,
-            runTimeTrip: 50,
-            time: 'not-a-date',
-          }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: 100,
+              runTimeTrip: 50,
+              time: 'not-a-date',
+            },
+          ],
         },
       };
       const res = {
@@ -602,12 +710,14 @@ describe('signalk-engine-hours plugin', function () {
     it('PUT /hours should sanitize input (strip extra properties)', async function () {
       const req = {
         body: {
-          paths: [{
-            path: 'propulsion.main.revolutions',
-            runTime: 100,
-            runTimeTrip: 50,
-            malicious: '<script>alert("xss")</script>',
-          }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: 100,
+              runTimeTrip: 50,
+              malicious: '<script>alert("xss")</script>',
+            },
+          ],
         },
       };
       const res = {
@@ -629,11 +739,13 @@ describe('signalk-engine-hours plugin', function () {
 
       const req = {
         body: {
-          paths: [{
-            path: 'propulsion.main.revolutions',
-            runTime: 100,
-            runTimeTrip: 50,
-          }],
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: 100,
+              runTimeTrip: 50,
+            },
+          ],
         },
       };
       const res = {
@@ -667,8 +779,12 @@ describe('signalk-engine-hours plugin', function () {
       // GET /hours after stop should return empty
       const localRoutes = {};
       const router = {
-        get: (p, handler) => { localRoutes[`GET ${p}`] = handler; },
-        put: (p, handler) => { localRoutes[`PUT ${p}`] = handler; },
+        get: (p, handler) => {
+          localRoutes[`GET ${p}`] = handler;
+        },
+        put: (p, handler) => {
+          localRoutes[`PUT ${p}`] = handler;
+        },
       };
       plugin.registerWithRouter(router);
       const res = { json: sinon.stub() };
@@ -679,11 +795,15 @@ describe('signalk-engine-hours plugin', function () {
 
     it('should flush pending writes before resetting', async function () {
       plugin.start(defaultOptions);
-      deltaCallback(makeDelta('propulsion.main.revolutions', 100));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
       const flushed = plugin.stop();
       await flushed;
 
-      const content = await fs.readFile(path.join(tmpDir, 'engines.json'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(tmpDir, 'engines.json'),
+        'utf-8',
+      );
       const data = JSON.parse(content);
       assert.equal(data.engines.paths[0].runTime, 60);
     });
@@ -698,7 +818,8 @@ describe('signalk-engine-hours plugin', function () {
       app.handleMessage.resetHistory();
       deltaCallback(makeDelta('propulsion.main.revolutions', 100));
 
-      const metaCalls = app.handleMessage.getCalls()
+      const metaCalls = app.handleMessage
+        .getCalls()
         .filter((c) => c.args[1].updates[0].meta);
       assert.equal(metaCalls.length, 1);
     });

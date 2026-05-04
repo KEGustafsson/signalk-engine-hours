@@ -1,425 +1,485 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
+  <head>
     <title>Engine Hours Editor</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A web application for editing engine hours data.">
-    <link rel="icon" type="image/png" href="icons/icon-72x72.png">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"
-          integrity="sha512-iecdLmaskl0HPNiecjHem/PY0MlBo28fLzir9MYgmT7PEFPx1RzEdQl+OPbzo9SMiiTFAr2+2bNjVHdaflAt2ag=="
-          crossorigin="anonymous" referrerpolicy="no-referrer">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A web application for editing engine hours data."
+    />
+    <link rel="icon" type="image/png" href="icons/icon-72x72.png" />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      rel="stylesheet"
+      integrity="sha512-iecdLmaskl0HPNiecjHem/PY0MlBo28fLzir9MYgmT7PEFPx1RzEdQl+OPbzo9SMiiTFAr2+2bNjVHdaflAt2ag=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
     <style>
-        :root {
-            --primary-color: #2563eb;
-            --secondary-color: #64748b;
-            --success-color: #059669;
-            --danger-color: #dc2626;
-            --warning-color: #d97706;
-            --dark-color: #1e293b;
-            --light-bg: #f8fafc;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --card-hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
+      :root {
+        --primary-color: #2563eb;
+        --secondary-color: #64748b;
+        --success-color: #059669;
+        --danger-color: #dc2626;
+        --warning-color: #d97706;
+        --dark-color: #1e293b;
+        --light-bg: #f8fafc;
+        --card-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --card-hover-shadow:
+          0 10px 15px -3px rgba(0, 0, 0, 0.1),
+          0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      }
 
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
 
+      .main-container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: var(--card-shadow);
+        margin: 2rem auto;
+        max-width: 1200px;
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(
+          135deg,
+          var(--primary-color) 0%,
+          #3b82f6 100%
+        );
+        color: white;
+        padding: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 2rem;
+      }
+
+      .header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .content-area {
+        padding: 2rem;
+      }
+
+      .engine-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        box-shadow: var(--card-shadow);
+        transition: all 0.3s ease;
+        overflow: hidden;
+      }
+
+      .engine-card:hover {
+        box-shadow: var(--card-hover-shadow);
+        transform: translateY(-1px);
+      }
+
+      .engine-header {
+        background: linear-gradient(135deg, var(--light-bg) 0%, #e2e8f0 100%);
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .engine-name {
+        font-weight: 600;
+        color: var(--dark-color);
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+      }
+
+      .engine-name i {
+        margin-right: 0.5rem;
+        color: var(--primary-color);
+      }
+
+      .engine-body {
+        padding: 1.5rem;
+      }
+
+      .metric-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .metric-group {
+        flex: 1;
+      }
+
+      .metric-label {
+        display: block;
+        font-weight: 600;
+        color: var(--secondary-color);
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .metric-input {
+        width: 100%;
+        padding: 0.75rem 3.5rem 0.75rem 1rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 1.125rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        background: white;
+        box-sizing: border-box;
+      }
+
+      .metric-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .metric-input:hover {
+        border-color: #cbd5e1;
+      }
+
+      .metric-unit {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--secondary-color);
+        font-size: 0.875rem;
+        pointer-events: none;
+      }
+
+      .metric-wrapper {
+        position: relative;
+      }
+
+      .delete-btn {
+        background: linear-gradient(
+          135deg,
+          var(--danger-color) 0%,
+          #ef4444 100%
+        );
+        border: none;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .delete-btn:hover {
+        background: linear-gradient(
+          135deg,
+          #b91c1c 0%,
+          var(--danger-color) 100%
+        );
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 2rem;
+      }
+
+      .btn-modern {
+        padding: 0.75rem 2rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-transform: none;
+      }
+
+      .btn-primary-modern {
+        background: linear-gradient(
+          135deg,
+          var(--primary-color) 0%,
+          #3b82f6 100%
+        );
+        color: white;
+      }
+
+      .btn-primary-modern:hover:not(:disabled) {
+        background: linear-gradient(
+          135deg,
+          #1d4ed8 0%,
+          var(--primary-color) 100%
+        );
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+      }
+
+      .btn-success-modern {
+        background: linear-gradient(
+          135deg,
+          var(--success-color) 0%,
+          #10b981 100%
+        );
+        color: white;
+      }
+
+      .btn-success-modern:hover:not(:disabled) {
+        background: linear-gradient(
+          135deg,
+          #047857 0%,
+          var(--success-color) 100%
+        );
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+      }
+
+      .btn-modern:disabled {
+        background: #9ca3af !important;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      .alert-modern {
+        border: none;
+        border-radius: 8px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .alert-danger-modern {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        color: var(--danger-color);
+        border-left: 4px solid var(--danger-color);
+      }
+
+      .alert-dismiss {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: var(--danger-color);
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0 0.25rem;
+        opacity: 0.7;
+      }
+
+      .alert-dismiss:hover {
+        opacity: 1;
+      }
+
+      @media (max-width: 768px) {
         .main-container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
-            margin: 2rem auto;
-            max-width: 1200px;
-            overflow: hidden;
+          margin: 1rem;
+          border-radius: 12px;
         }
 
         .header {
-            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
-            color: white;
-            padding: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-weight: 600;
-            font-size: 2rem;
-        }
-
-        .header-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+          padding: 1.5rem;
         }
 
         .content-area {
-            padding: 2rem;
-        }
-
-        .engine-card {
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            margin-bottom: 1rem;
-            box-shadow: var(--card-shadow);
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-
-        .engine-card:hover {
-            box-shadow: var(--card-hover-shadow);
-            transform: translateY(-1px);
-        }
-
-        .engine-header {
-            background: linear-gradient(135deg, var(--light-bg) 0%, #e2e8f0 100%);
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .engine-name {
-            font-weight: 600;
-            color: var(--dark-color);
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-        }
-
-        .engine-name i {
-            margin-right: 0.5rem;
-            color: var(--primary-color);
-        }
-
-        .engine-body {
-            padding: 1.5rem;
+          padding: 1rem;
         }
 
         .metric-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .metric-group {
-            flex: 1;
-        }
-
-        .metric-label {
-            display: block;
-            font-weight: 600;
-            color: var(--secondary-color);
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .metric-input {
-            width: 100%;
-            padding: 0.75rem 3.5rem 0.75rem 1rem;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 1.125rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            background: white;
-            box-sizing: border-box;
-        }
-
-        .metric-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .metric-input:hover {
-            border-color: #cbd5e1;
-        }
-
-        .metric-unit {
-            position: absolute;
-            right: 0.75rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--secondary-color);
-            font-size: 0.875rem;
-            pointer-events: none;
-        }
-
-        .metric-wrapper {
-            position: relative;
-        }
-
-        .delete-btn {
-            background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
-            border: none;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .delete-btn:hover {
-            background: linear-gradient(135deg, #b91c1c 0%, var(--danger-color) 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+          flex-direction: column;
+          gap: 0.5rem;
         }
 
         .action-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            margin-top: 2rem;
+          flex-direction: column;
         }
 
         .btn-modern {
-            padding: 0.75rem 2rem;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-transform: none;
+          justify-content: center;
         }
+      }
 
-        .btn-primary-modern {
-            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
-            color: white;
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid transparent;
+        border-top: 2px solid currentColor;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
-
-        .btn-primary-modern:hover:not(:disabled) {
-            background: linear-gradient(135deg, #1d4ed8 0%, var(--primary-color) 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        100% {
+          transform: rotate(360deg);
         }
-
-        .btn-success-modern {
-            background: linear-gradient(135deg, var(--success-color) 0%, #10b981 100%);
-            color: white;
-        }
-
-        .btn-success-modern:hover:not(:disabled) {
-            background: linear-gradient(135deg, #047857 0%, var(--success-color) 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
-        }
-
-        .btn-modern:disabled {
-            background: #9ca3af !important;
-            cursor: not-allowed;
-            transform: none !important;
-            box-shadow: none !important;
-        }
-
-        .alert-modern {
-            border: none;
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: var(--card-shadow);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .alert-danger-modern {
-            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-            color: var(--danger-color);
-            border-left: 4px solid var(--danger-color);
-        }
-
-        .alert-dismiss {
-            margin-left: auto;
-            background: none;
-            border: none;
-            color: var(--danger-color);
-            cursor: pointer;
-            font-size: 1.2rem;
-            padding: 0 0.25rem;
-            opacity: 0.7;
-        }
-
-        .alert-dismiss:hover {
-            opacity: 1;
-        }
-
-@media (max-width: 768px) {
-            .main-container {
-                margin: 1rem;
-                border-radius: 12px;
-            }
-
-            .header {
-                padding: 1.5rem;
-            }
-
-            .content-area {
-                padding: 1rem;
-            }
-
-            .metric-row {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .action-buttons {
-                flex-direction: column;
-            }
-
-            .btn-modern {
-                justify-content: center;
-            }
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid transparent;
-            border-top: 2px solid currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="main-container">
-        <div class="header">
-            <img src="icons/icon-72x72.png" alt="Engine Hours Icon" class="header-icon">
-            <h1>Engine Hours Editor</h1>
+      <div class="header">
+        <img
+          src="icons/icon-72x72.png"
+          alt="Engine Hours Icon"
+          class="header-icon"
+        />
+        <h1>Engine Hours Editor</h1>
+      </div>
+      <div class="content-area">
+        <div id="error-container" role="alert" aria-live="polite"></div>
+        <div id="json-container"></div>
+        <div class="action-buttons">
+          <button
+            id="reload-button"
+            class="btn-modern btn-primary-modern"
+            aria-label="Reload Data"
+          >
+            <i class="fas fa-sync-alt"></i>
+            Reload Data
+          </button>
+          <button
+            id="save-button"
+            class="btn-modern btn-success-modern"
+            style="display: none"
+            aria-label="Save Changes"
+          >
+            <i class="fas fa-save"></i>
+            Save Changes
+          </button>
         </div>
-        <div class="content-area">
-            <div id="error-container" role="alert" aria-live="polite"></div>
-            <div id="json-container"></div>
-            <div class="action-buttons">
-                <button id="reload-button" class="btn-modern btn-primary-modern" aria-label="Reload Data">
-                    <i class="fas fa-sync-alt"></i>
-                    Reload Data
-                </button>
-                <button id="save-button" class="btn-modern btn-success-modern" style="display: none;" aria-label="Save Changes">
-                    <i class="fas fa-save"></i>
-                    Save Changes
-                </button>
-            </div>
-        </div>
+      </div>
     </div>
 
     <script>
-        const url = window.location.origin + '/plugins/signalk-engine-hours/hours';
-        let jsonData = null;
-        let isSaving = false;
-        let isFetching = false;
+      const url =
+        window.location.origin + '/plugins/signalk-engine-hours/hours';
+      let jsonData = null;
+      let isSaving = false;
+      let isFetching = false;
 
-        function escapeAttr(str) {
-            return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      function escapeAttr(str) {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function setButtonsEnabled(enabled) {
+        document.getElementById('reload-button').disabled = !enabled;
+        if (!enabled) {
+          document.getElementById('save-button').style.display = 'none';
+        } else {
+          checkChanges();
         }
+      }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+      // Function to fetch JSON data from the server
+      async function fetchData() {
+        if (isFetching) return;
+        isFetching = true;
+        setButtonsEnabled(false);
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          jsonData = await response.json();
+          if (!jsonData || !Array.isArray(jsonData.paths)) {
+            jsonData = { paths: [] };
+            displayErrorMessage('Invalid data received from server');
+          }
+          displayJsonData();
+        } catch (error) {
+          displayErrorMessage(error.message);
+        } finally {
+          isFetching = false;
+          setButtonsEnabled(true);
         }
+      }
 
-        function setButtonsEnabled(enabled) {
-            document.getElementById('reload-button').disabled = !enabled;
-            if (!enabled) {
-                document.getElementById('save-button').style.display = 'none';
-            } else {
-                checkChanges();
-            }
-        }
+      // Function to display JSON data and make runTime editable
+      function displayJsonData() {
+        const jsonContainer = document.getElementById('json-container');
+        jsonContainer.innerHTML = '';
 
-        // Function to fetch JSON data from the server
-        async function fetchData() {
-            if (isFetching) return;
-            isFetching = true;
-            setButtonsEnabled(false);
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                jsonData = await response.json();
-                if (!jsonData || !Array.isArray(jsonData.paths)) {
-                    jsonData = { paths: [] };
-                    displayErrorMessage('Invalid data received from server');
-                }
-                displayJsonData();
-            } catch (error) {
-                displayErrorMessage(error.message);
-            } finally {
-                isFetching = false;
-                setButtonsEnabled(true);
-            }
-        }
+        jsonData.paths.forEach((pathData, index) => {
+          const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
+          const rawName = matches ? matches[1] : 'unknown';
+          const safeAttrName = escapeAttr(rawName);
+          const runTimeHours = (pathData.runTime / 3600).toFixed(2);
+          const runTimeTripHours = (pathData.runTimeTrip / 3600).toFixed(2);
 
-        // Function to display JSON data and make runTime editable
-        function displayJsonData() {
-            const jsonContainer = document.getElementById('json-container');
-            jsonContainer.innerHTML = '';
+          const card = document.createElement('div');
+          card.className = 'engine-card';
 
-jsonData.paths.forEach((pathData, index) => {
-                const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
-                const rawName = matches ? matches[1] : 'unknown';
-                const safeAttrName = escapeAttr(rawName);
-                const runTimeHours = (pathData.runTime / 3600).toFixed(2);
-                const runTimeTripHours = (pathData.runTimeTrip / 3600).toFixed(2);
+          // Build header
+          const headerEl = document.createElement('div');
+          headerEl.className = 'engine-header';
 
-                const card = document.createElement('div');
-                card.className = 'engine-card';
+          const nameEl = document.createElement('div');
+          nameEl.className = 'engine-name';
+          const icon = document.createElement('i');
+          icon.className = 'fas fa-cog';
+          nameEl.appendChild(icon);
+          nameEl.appendChild(document.createTextNode(' propulsion.' + rawName));
 
-                // Build header
-                const headerEl = document.createElement('div');
-                headerEl.className = 'engine-header';
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delete-btn';
+          deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+          deleteBtn.addEventListener('click', () => deleteSection(index));
 
-                const nameEl = document.createElement('div');
-                nameEl.className = 'engine-name';
-                const icon = document.createElement('i');
-                icon.className = 'fas fa-cog';
-                nameEl.appendChild(icon);
-                nameEl.appendChild(document.createTextNode(' propulsion.' + rawName));
+          headerEl.appendChild(nameEl);
+          headerEl.appendChild(deleteBtn);
+          card.appendChild(headerEl);
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-btn';
-                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
-                deleteBtn.addEventListener('click', () => deleteSection(index));
-
-                headerEl.appendChild(nameEl);
-                headerEl.appendChild(deleteBtn);
-                card.appendChild(headerEl);
-
-                // Build body with inputs
-                const bodyEl = document.createElement('div');
-                bodyEl.className = 'engine-body';
-                bodyEl.innerHTML = `
+          // Build body with inputs
+          const bodyEl = document.createElement('div');
+          bodyEl.className = 'engine-body';
+          bodyEl.innerHTML = `
                     <div class="metric-row">
                         <div class="metric-group">
                             <label class="metric-label" for="runTime${index}">Total Runtime</label>
@@ -445,128 +505,140 @@ jsonData.paths.forEach((pathData, index) => {
                         </div>
                     </div>
                 `;
-                card.appendChild(bodyEl);
-                jsonContainer.appendChild(card);
-            });
-
-            checkChanges();
-        }
-
-        // Function to delete a section from the JSON data
-        function deleteSection(index) {
-            if (jsonData.paths.length <= index) return;
-            const matches = jsonData.paths[index].path.match(/[^.]+\.(.+)\.[^.]+/);
-            const name = matches ? matches[1] : 'this engine';
-            if (!confirm(`Delete ${name}? This cannot be undone after saving.`)) return;
-            jsonData.paths.splice(index, 1);
-            displayJsonData();
-            document.getElementById('save-button').style.display = '';
-        }
-
-        // Function to send edited data back to the server using PUT
-        async function saveChanges() {
-            if (isSaving) return;
-            isSaving = true;
-            setButtonsEnabled(false);
-            try {
-                // Update jsonData with modified values from input fields using data attributes
-                const inputs = document.querySelectorAll('input[data-path-index][data-field]');
-                for (let i = 0; i < inputs.length; i++) {
-                    const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
-                    const field = inputs[i].dataset.field;
-                    const inputValue = parseFloat(inputs[i].value);
-                    if (isNaN(inputValue) || inputValue < 0) {
-                        displayErrorMessage(`Invalid value for ${field} at engine ${pathIndex + 1}. Must be a non-negative number.`);
-                        return;
-                    }
-                    if (field === 'runTime' || field === 'runTimeTrip') {
-                        jsonData.paths[pathIndex][field] = Math.round(inputValue * 3600);
-                    }
-                }
-
-                const response = await fetch(url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(jsonData)
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                fetchData();
-            } catch (error) {
-                displayErrorMessage(error.message);
-            } finally {
-                isSaving = false;
-                setButtonsEnabled(true);
-            }
-        }
-
-        // Function to display error messages to the user
-        function displayErrorMessage(message) {
-            const errorContainer = document.getElementById('error-container');
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'alert-modern alert-danger-modern';
-
-            const textSpan = document.createElement('span');
-            textSpan.textContent = message;
-            errorDiv.appendChild(textSpan);
-
-            const dismissBtn = document.createElement('button');
-            dismissBtn.className = 'alert-dismiss';
-            dismissBtn.innerHTML = '&times;';
-            dismissBtn.setAttribute('aria-label', 'Dismiss error');
-            dismissBtn.addEventListener('click', () => errorDiv.remove());
-            errorDiv.appendChild(dismissBtn);
-
-            errorContainer.appendChild(errorDiv);
-            setTimeout(() => {
-                if (errorDiv.parentNode) errorDiv.remove();
-            }, 8000);
-        }
-
-        // Function to check if any values have changed and enable/disable the Save button accordingly
-        function checkChanges() {
-            const saveButton = document.getElementById('save-button');
-            const inputs = document.querySelectorAll('input[data-path-index][data-field]');
-            let dataChanged = false;
-
-            for (let i = 0; i < inputs.length; i++) {
-                const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
-                const field = inputs[i].dataset.field;
-                const inputValue = parseFloat(inputs[i].value);
-                if (isNaN(inputValue)) {
-                    dataChanged = true;
-                    break;
-                }
-                const originalDisplayed = parseFloat((jsonData.paths[pathIndex][field] / 3600).toFixed(2));
-                if (inputValue !== originalDisplayed) {
-                    dataChanged = true;
-                    break;
-                }
-            }
-
-            saveButton.style.display = dataChanged ? '' : 'none';
-        }
-
-        // Event listener for the Reload Data button
-        document.getElementById('reload-button').addEventListener('click', fetchData);
-
-        // Event listener for the Save Changes button
-        document.getElementById('save-button').addEventListener('click', saveChanges);
-
-        // Event listener to track changes in input values
-        document.addEventListener('input', (event) => {
-            const input = event.target;
-            if (input.tagName === 'INPUT' && input.type === 'number') {
-                checkChanges();
-            }
+          card.appendChild(bodyEl);
+          jsonContainer.appendChild(card);
         });
 
-        // Fetch and display data when the page loads
-        fetchData();
-    </script>
-</body>
+        checkChanges();
+      }
 
+      // Function to delete a section from the JSON data
+      function deleteSection(index) {
+        if (jsonData.paths.length <= index) return;
+        const matches = jsonData.paths[index].path.match(/[^.]+\.(.+)\.[^.]+/);
+        const name = matches ? matches[1] : 'this engine';
+        if (!confirm(`Delete ${name}? This cannot be undone after saving.`))
+          return;
+        jsonData.paths.splice(index, 1);
+        displayJsonData();
+        document.getElementById('save-button').style.display = '';
+      }
+
+      // Function to send edited data back to the server using PUT
+      async function saveChanges() {
+        if (isSaving) return;
+        isSaving = true;
+        setButtonsEnabled(false);
+        try {
+          // Update jsonData with modified values from input fields using data attributes
+          const inputs = document.querySelectorAll(
+            'input[data-path-index][data-field]',
+          );
+          for (let i = 0; i < inputs.length; i++) {
+            const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
+            const field = inputs[i].dataset.field;
+            const inputValue = parseFloat(inputs[i].value);
+            if (isNaN(inputValue) || inputValue < 0) {
+              displayErrorMessage(
+                `Invalid value for ${field} at engine ${pathIndex + 1}. Must be a non-negative number.`,
+              );
+              return;
+            }
+            if (field === 'runTime' || field === 'runTimeTrip') {
+              jsonData.paths[pathIndex][field] = Math.round(inputValue * 3600);
+            }
+          }
+
+          const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(jsonData),
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          fetchData();
+        } catch (error) {
+          displayErrorMessage(error.message);
+        } finally {
+          isSaving = false;
+          setButtonsEnabled(true);
+        }
+      }
+
+      // Function to display error messages to the user
+      function displayErrorMessage(message) {
+        const errorContainer = document.getElementById('error-container');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert-modern alert-danger-modern';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = message;
+        errorDiv.appendChild(textSpan);
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.className = 'alert-dismiss';
+        dismissBtn.innerHTML = '&times;';
+        dismissBtn.setAttribute('aria-label', 'Dismiss error');
+        dismissBtn.addEventListener('click', () => errorDiv.remove());
+        errorDiv.appendChild(dismissBtn);
+
+        errorContainer.appendChild(errorDiv);
+        setTimeout(() => {
+          if (errorDiv.parentNode) errorDiv.remove();
+        }, 8000);
+      }
+
+      // Function to check if any values have changed and enable/disable the Save button accordingly
+      function checkChanges() {
+        const saveButton = document.getElementById('save-button');
+        const inputs = document.querySelectorAll(
+          'input[data-path-index][data-field]',
+        );
+        let dataChanged = false;
+
+        for (let i = 0; i < inputs.length; i++) {
+          const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
+          const field = inputs[i].dataset.field;
+          const inputValue = parseFloat(inputs[i].value);
+          if (isNaN(inputValue)) {
+            dataChanged = true;
+            break;
+          }
+          const originalDisplayed = parseFloat(
+            (jsonData.paths[pathIndex][field] / 3600).toFixed(2),
+          );
+          if (inputValue !== originalDisplayed) {
+            dataChanged = true;
+            break;
+          }
+        }
+
+        saveButton.style.display = dataChanged ? '' : 'none';
+      }
+
+      // Event listener for the Reload Data button
+      document
+        .getElementById('reload-button')
+        .addEventListener('click', fetchData);
+
+      // Event listener for the Save Changes button
+      document
+        .getElementById('save-button')
+        .addEventListener('click', saveChanges);
+
+      // Event listener to track changes in input values
+      document.addEventListener('input', (event) => {
+        const input = event.target;
+        if (input.tagName === 'INPUT' && input.type === 'number') {
+          checkChanges();
+        }
+      });
+
+      // Fetch and display data when the page loads
+      fetchData();
+    </script>
+  </body>
 </html>
