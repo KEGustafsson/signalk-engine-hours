@@ -203,10 +203,12 @@ module.exports = function createPlugin(app) {
             engine.running = v.value > 0 || v.value === 'started';
 
             if (previousEngine.running && previousEngine.time) {
-              const elapsedSeconds = Math.max(
-                0,
-                (new Date(deltaTime) - new Date(previousEngine.time)) / 1000,
-              );
+              const prevMs = Date.parse(previousEngine.time);
+              const currMs = Date.parse(deltaTime);
+              const elapsedSeconds =
+                Number.isFinite(prevMs) && Number.isFinite(currMs)
+                  ? Math.max(0, (currMs - prevMs) / 1000)
+                  : 0;
               engine.runTime += elapsedSeconds;
               engine.runTimeTrip += elapsedSeconds;
               app.debug('increment engine hours', {
