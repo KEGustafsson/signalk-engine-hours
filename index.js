@@ -58,7 +58,7 @@ module.exports = function createPlugin(app) {
   }
 
   plugin.start = function start(options) {
-    const updateRate = options.updateRate || 60;
+    const updateRate = Math.max(1, options.updateRate || 60);
     enginesFile = join(app.getDataDirPath(), 'engines.json');
 
     function reportData(engine) {
@@ -130,7 +130,7 @@ module.exports = function createPlugin(app) {
                 path: typeof p.path === 'string' ? p.path : '',
                 runTime: sanitizeNumber(p.runTime, 0),
                 runTimeTrip: sanitizeNumber(p.runTimeTrip, 0),
-                running: p.running || false,
+                running: false, // intentionally non-durable: prevents phantom time accrual across restarts
                 time: p.time || new Date().toISOString(),
               })),
             };
@@ -143,7 +143,7 @@ module.exports = function createPlugin(app) {
         }
         const numberEngines = engines.paths.length;
         app.debug(`Number of engines: ${numberEngines}`);
-        app.debug(engines.paths);
+        app.debug(JSON.stringify(engines.paths));
         engines.paths.forEach((engine) => {
           reportData(engine);
         });
@@ -201,14 +201,14 @@ module.exports = function createPlugin(app) {
             engine.running = v.value > 0 || v.value === 'started';
 
             if (previousEngine.running && previousEngine.time) {
-              const ellapsedSeconds = Math.max(
+              const elapsedSeconds = Math.max(
                 0,
                 (new Date(engine.time) - new Date(previousEngine.time)) / 1000,
               );
-              engine.runTime += ellapsedSeconds;
-              engine.runTimeTrip += ellapsedSeconds;
+              engine.runTime += elapsedSeconds;
+              engine.runTimeTrip += elapsedSeconds;
               app.debug('increment engine hours', {
-                ellapsedSeconds,
+                elapsedSeconds,
               });
             }
 
@@ -239,7 +239,7 @@ module.exports = function createPlugin(app) {
         newEngines.paths.every(
           (p) =>
             typeof p.path === 'string' &&
-            /^propulsion\.[a-zA-Z0-9_-]+\./.test(p.path) &&
+            /^propulsion\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_.]+$/.test(p.path) &&
             Number.isFinite(p.runTime) &&
             p.runTime >= 0 &&
             Number.isFinite(p.runTimeTrip) &&
@@ -251,7 +251,7 @@ module.exports = function createPlugin(app) {
             path: p.path,
             runTime: p.runTime,
             runTimeTrip: p.runTimeTrip,
-            running: p.running,
+            running: !!p.running,
             time:
               typeof p.time === 'string' && !Number.isNaN(Date.parse(p.time))
                 ? p.time
@@ -275,8 +275,8 @@ module.exports = function createPlugin(app) {
     unsubscribes = [];
     const flushed = flushWrite();
     engines = { paths: [] };
-    writePromise = Promise.resolve();
     metaPublished.clear();
+    writePromise = flushed.catch(() => {});
     return flushed;
   };
 
