@@ -130,7 +130,7 @@ module.exports = function createPlugin(app) {
                 path: typeof p.path === 'string' ? p.path : '',
                 runTime: sanitizeNumber(p.runTime, 0),
                 runTimeTrip: sanitizeNumber(p.runTimeTrip, 0),
-                running: false,
+                running: false, // intentionally non-durable: prevents phantom time accrual across restarts
                 time: p.time || new Date().toISOString(),
               })),
             };

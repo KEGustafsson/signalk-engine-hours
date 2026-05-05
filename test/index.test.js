@@ -506,7 +506,6 @@ describe('signalk-engine-hours plugin', function () {
 
       // Stop while engine is still "running" — persists running:true
       await plugin.stop();
-      await new Promise((r) => setTimeout(r, 200));
 
       // Manually patch the saved file to set running:true (as the old code would have done)
       const filePath = path.join(tmpDir, 'engines.json');
