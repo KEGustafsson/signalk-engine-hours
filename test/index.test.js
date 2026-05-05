@@ -11,7 +11,6 @@ describe('signalk-engine-hours plugin', function () {
   let deltaCallback;
   let errorCallback;
   let tmpDir;
-  let clock;
   const defaultOptions = {
     updateRate: 60,
     monitorPath: 'propulsion.*.revolutions',
@@ -60,10 +59,6 @@ describe('signalk-engine-hours plugin', function () {
   });
 
   afterEach(async function () {
-    if (clock) {
-      clock.restore();
-      clock = null;
-    }
     if (plugin) {
       plugin.stop();
     }
@@ -499,6 +494,41 @@ describe('signalk-engine-hours plugin', function () {
       const files = await fs.readdir(tmpDir);
       assert.ok(!files.includes('engines.json.tmp'));
       assert.ok(files.includes('engines.json'));
+    });
+
+    it('should not accrue time across a restart when engine was running', async function () {
+      // Engine is running at stop time; saved with running:true in file.
+      // On reload, running must be reset to false so the gap between
+      // plugin stop and restart does not inflate the counter.
+      plugin.start(defaultOptions);
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
+
+      // Stop while engine is still "running" — persists running:true
+      await plugin.stop();
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Manually patch the saved file to set running:true (as the old code would have done)
+      const filePath = path.join(tmpDir, 'engines.json');
+      const saved = JSON.parse(await fs.readFile(filePath, 'utf-8'));
+      saved.engines.paths[0].running = true;
+      // Simulate 1 hour of server downtime by backdating the saved timestamp
+      saved.engines.paths[0].time = ts(-3600);
+      await fs.writeFile(filePath, JSON.stringify(saved));
+
+      // Restart plugin
+      plugin = createPlugin(app);
+      plugin.start(defaultOptions);
+      await new Promise((r) => setTimeout(r, 100));
+
+      // First delta after restart — must NOT add 3600s of phantom time
+      app.handleMessage.resetHistory();
+      deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(3660)));
+
+      const msg = app.handleMessage.lastCall.args[1];
+      const runTime = msg.updates[0].values[0].value;
+      // Should still be ~60s (from before restart), not 3660s+
+      assert.ok(runTime <= 60, `Expected runTime <= 60 but got ${runTime}`);
     });
 
     it('should debounce multiple rapid updates into one write', async function () {

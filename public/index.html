@@ -8,11 +8,15 @@
       name="description"
       content="A web application for editing engine hours data."
     />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; img-src 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline';"
+    />
     <link rel="icon" type="image/png" href="icons/icon-72x72.png" />
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
       rel="stylesheet"
-      integrity="sha512-iecdLmaskl0HPNiecjHem/PY0MlBo28fLzir9MYgmT7PEFPx1RzEdQl+OPbzo9SMiiTFAr2+2bNjVHdaflAt2ag=="
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
@@ -527,28 +531,33 @@
       // Function to send edited data back to the server using PUT
       async function saveChanges() {
         if (isSaving) return;
+
+        // Validate all inputs before locking the UI
+        const inputs = document.querySelectorAll(
+          'input[data-path-index][data-field]',
+        );
+        const updates = [];
+        for (let i = 0; i < inputs.length; i++) {
+          const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
+          const field = inputs[i].dataset.field;
+          const inputValue = parseFloat(inputs[i].value);
+          if (isNaN(inputValue) || inputValue < 0) {
+            displayErrorMessage(
+              `Invalid value for ${field} at engine ${pathIndex + 1}. Must be a non-negative number.`,
+            );
+            return;
+          }
+          if (field === 'runTime' || field === 'runTimeTrip') {
+            updates.push({ pathIndex, field, value: Math.round(inputValue * 3600) });
+          }
+        }
+
         isSaving = true;
         setButtonsEnabled(false);
         try {
-          // Update jsonData with modified values from input fields using data attributes
-          const inputs = document.querySelectorAll(
-            'input[data-path-index][data-field]',
-          );
-          for (let i = 0; i < inputs.length; i++) {
-            const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
-            const field = inputs[i].dataset.field;
-            const inputValue = parseFloat(inputs[i].value);
-            if (isNaN(inputValue) || inputValue < 0) {
-              displayErrorMessage(
-                `Invalid value for ${field} at engine ${pathIndex + 1}. Must be a non-negative number.`,
-              );
-              return;
-            }
-            if (field === 'runTime' || field === 'runTimeTrip') {
-              jsonData.paths[pathIndex][field] = Math.round(inputValue * 3600);
-            }
-          }
-
+          updates.forEach(({ pathIndex, field, value }) => {
+            jsonData.paths[pathIndex][field] = value;
+          });
           const response = await fetch(url, {
             method: 'PUT',
             headers: {
