@@ -1,6 +1,6 @@
 {
   "name": "signalk-engine-hours",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Persistent engine hours logger. Log all engines, which report revolutions to SignalK",
   "main": "index.js",
   "engines": {

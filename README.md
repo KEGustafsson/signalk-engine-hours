@@ -14,8 +14,9 @@ Signal K engine hours logger keeps engine runtime data in persistent storage. En
 - v0.4.0 tooltip to show hrs:min
 - v1.0.0 1st release
 - v1.1.0 fix: improve error handling and validation for engine data
-- v1.2.0 feat: option to monitor propulsion.\*.state
+- v1.2.0 feat: option to monitor propulsion.*.state
 - v1.3.0 new UI and fixes to code
 - v1.3.1 chore: clean-up
 - v1.4.0 feat: improved time calculation accuracy
 - v1.4.1 fix: engine hours accrual bug
+- v1.5.0 feat: engine hours reporing optimized 
