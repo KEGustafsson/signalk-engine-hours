@@ -180,9 +180,11 @@ module.exports = function createPlugin(app) {
           if (!u.values) return;
           u.values.forEach((v) => {
             let engine = engines.paths.find((item) => item.path === v.path);
+            let isNew = false;
 
             if (!engine) {
               app.debug('new engine');
+              isNew = true;
               engine = {
                 path: v.path,
                 runTime: 0,
@@ -195,16 +197,18 @@ module.exports = function createPlugin(app) {
             const previousEngine = { ...engine };
 
             const tsMs = u.timestamp ? Date.parse(u.timestamp) : NaN;
-            engine.time = Number.isFinite(tsMs)
+            const deltaTime = Number.isFinite(tsMs)
               ? new Date(tsMs).toISOString()
               : new Date().toISOString();
             engine.running = v.value > 0 || v.value === 'started';
 
             if (previousEngine.running && previousEngine.time) {
-              const elapsedSeconds = Math.max(
-                0,
-                (new Date(engine.time) - new Date(previousEngine.time)) / 1000,
-              );
+              const prevMs = Date.parse(previousEngine.time);
+              const currMs = Date.parse(deltaTime);
+              const elapsedSeconds =
+                Number.isFinite(prevMs) && Number.isFinite(currMs)
+                  ? Math.max(0, (currMs - prevMs) / 1000)
+                  : 0;
               engine.runTime += elapsedSeconds;
               engine.runTimeTrip += elapsedSeconds;
               app.debug('increment engine hours', {
@@ -212,15 +216,19 @@ module.exports = function createPlugin(app) {
               });
             }
 
+            if (engine.running) {
+              engine.time = deltaTime;
+            }
+
             if (
+              isNew ||
               previousEngine.running !== engine.running ||
               previousEngine.runTime !== engine.runTime
             ) {
               app.debug('saving');
               scheduleDebouncedWrite();
+              reportData(engine);
             }
-
-            reportData(engine);
           });
         });
       },

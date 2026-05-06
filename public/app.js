@@ -1,5 +1,4 @@
-const url =
-  window.location.origin + '/plugins/signalk-engine-hours/hours';
+const url = window.location.origin + '/plugins/signalk-engine-hours/hours';
 let jsonData = null;
 let isSaving = false;
 let isFetching = false;
@@ -11,12 +10,6 @@ function escapeAttr(str) {
     .replace(/'/g, '&#39;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 function setButtonsEnabled(enabled) {
