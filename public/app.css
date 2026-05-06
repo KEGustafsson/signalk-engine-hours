@@ -9,8 +9,7 @@
   --card-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --card-hover-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 body {
@@ -29,11 +28,7 @@ body {
 }
 
 .header {
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    #3b82f6 100%
-  );
+  background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
   color: white;
   padding: 2rem;
   display: flex;
@@ -157,11 +152,7 @@ body {
 }
 
 .delete-btn {
-  background: linear-gradient(
-    135deg,
-    var(--danger-color) 0%,
-    #ef4444 100%
-  );
+  background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
   border: none;
   color: white;
   padding: 0.5rem 1rem;
@@ -176,11 +167,7 @@ body {
 }
 
 .delete-btn:hover {
-  background: linear-gradient(
-    135deg,
-    #b91c1c 0%,
-    var(--danger-color) 100%
-  );
+  background: linear-gradient(135deg, #b91c1c 0%, var(--danger-color) 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
 }
@@ -207,39 +194,23 @@ body {
 }
 
 .btn-primary-modern {
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    #3b82f6 100%
-  );
+  background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
   color: white;
 }
 
 .btn-primary-modern:hover:not(:disabled) {
-  background: linear-gradient(
-    135deg,
-    #1d4ed8 0%,
-    var(--primary-color) 100%
-  );
+  background: linear-gradient(135deg, #1d4ed8 0%, var(--primary-color) 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
 .btn-success-modern {
-  background: linear-gradient(
-    135deg,
-    var(--success-color) 0%,
-    #10b981 100%
-  );
+  background: linear-gradient(135deg, var(--success-color) 0%, #10b981 100%);
   color: white;
 }
 
 .btn-success-modern:hover:not(:disabled) {
-  background: linear-gradient(
-    135deg,
-    #047857 0%,
-    var(--success-color) 100%
-  );
+  background: linear-gradient(135deg, #047857 0%, var(--success-color) 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
 }
