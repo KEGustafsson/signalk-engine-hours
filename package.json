@@ -41,7 +41,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.20.0",
     "eslint-plugin-mocha": "^10.0.4",
-    "mocha": "^10.2.0",
+    "mocha": "^11.7.6",
     "prettier": "^3.8.3",
     "sinon": "^21.0.3"
   }
