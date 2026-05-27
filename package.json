@@ -22,7 +22,7 @@
     "signalk-category-utility"
   ],
   "signalk": {
-    "appIcon": "./public/icons/icon-72x72.png",
+    "appIcon": "./icons/icon-72x72.png",
     "displayName": "SignalK Engine Hours"
   },
   "signalk-plugin-enabled-by-default": false,

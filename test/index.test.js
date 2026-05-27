@@ -372,10 +372,11 @@ describe('signalk-engine-hours plugin', function () {
       assert.ok(!app.handleMessage.called);
     });
 
-    it('should skip paths that cannot be parsed for engine name', function () {
+    it('should skip paths that do not match the propulsion contract', function () {
       deltaCallback(makeDelta('invalidpath', 100));
 
-      assert.ok(app.debug.calledWithMatch(/Cannot extract engine name/));
+      // Rejected at the path-validation gate before any engine is created.
+      assert.ok(app.debug.calledWithMatch(/Skipping delta with invalid path/));
       // handleMessage should not be called for data (meta check won't happen either)
       const dataCalls = app.handleMessage
         .getCalls()
@@ -858,6 +859,196 @@ describe('signalk-engine-hours plugin', function () {
       deltaCallback(makeDelta('propulsion.main.revolutions', 100));
       const result = plugin.stop();
       assert.ok(result && typeof result.then === 'function');
+    });
+  });
+
+  describe('code review regression fixes', function () {
+    let routes;
+
+    function registerRoutes() {
+      routes = {};
+      plugin.registerWithRouter({
+        get: (p, handler) => {
+          routes[`GET ${p}`] = handler;
+        },
+        put: (p, handler) => {
+          routes[`PUT ${p}`] = handler;
+        },
+      });
+    }
+
+    function getEngines() {
+      const res = { json: sinon.stub() };
+      routes['GET /hours']({}, res);
+      return res.json.getCall(0).args[0];
+    }
+
+    function validPutReq() {
+      return {
+        body: {
+          paths: [
+            {
+              path: 'propulsion.main.revolutions',
+              runTime: 100,
+              runTimeTrip: 0,
+            },
+          ],
+        },
+      };
+    }
+
+    describe('accrual clamping', function () {
+      beforeEach(function () {
+        // updateRate 60 -> max step is 3 sampling periods = 180s
+        plugin.start(defaultOptions);
+        registerRoutes();
+      });
+
+      it('caps a long data gap so a dropout is not counted as runtime', function () {
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(3600)));
+        // A 1-hour gap while "running" must clamp to 180s, not 3600s.
+        assert.equal(getEngines().paths[0].runTime, 180);
+      });
+
+      it('never accrues negative time on a backward timestamp', function () {
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(60)));
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(30)));
+        // Backward step contributes 0, not a negative span.
+        assert.equal(getEngines().paths[0].runTime, 60);
+      });
+    });
+
+    describe('file load validation', function () {
+      it('drops engines whose path is not a valid propulsion path', async function () {
+        const existingData = {
+          engines: {
+            paths: [
+              {
+                path: 'propulsion.main.revolutions',
+                runTime: 3600,
+                runTimeTrip: 0,
+                time: BASE_TIME,
+              },
+              {
+                path: '<img src=x onerror=alert(1)>',
+                runTime: 100,
+                runTimeTrip: 0,
+                time: BASE_TIME,
+              },
+              { path: 123, runTime: 100, runTimeTrip: 0, time: BASE_TIME },
+            ],
+          },
+        };
+        await fs.writeFile(
+          path.join(tmpDir, 'engines.json'),
+          JSON.stringify(existingData),
+        );
+
+        plugin.start(defaultOptions);
+        await new Promise((r) => setTimeout(r, 100));
+        registerRoutes();
+
+        const data = getEngines();
+        assert.equal(data.paths.length, 1);
+        assert.equal(data.paths[0].path, 'propulsion.main.revolutions');
+      });
+    });
+
+    describe('live delta validation', function () {
+      beforeEach(function () {
+        plugin.start(defaultOptions);
+        registerRoutes();
+      });
+
+      it('ignores deltas whose path is not a valid propulsion path', function () {
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+        deltaCallback(makeDelta('not a valid path', 100, ts(0)));
+        deltaCallback(makeDelta('<img src=x onerror=alert(1)>', 100, ts(0)));
+
+        const data = getEngines();
+        assert.equal(data.paths.length, 1);
+        assert.equal(data.paths[0].path, 'propulsion.main.revolutions');
+      });
+    });
+
+    describe('PUT /hours authorization', function () {
+      beforeEach(function () {
+        plugin.start(defaultOptions);
+        registerRoutes();
+      });
+
+      it('returns 403 when the security strategy denies the write', function () {
+        app.securityStrategy = { shouldAllowPut: sinon.stub().returns(false) };
+        const res = {
+          status: sinon.stub().returnsThis(),
+          send: sinon.stub(),
+        };
+        routes['PUT /hours'](validPutReq(), res);
+        assert.ok(app.securityStrategy.shouldAllowPut.called);
+        assert.ok(res.status.calledWith(403));
+      });
+
+      it('allows the write when the security strategy permits it', async function () {
+        app.securityStrategy = { shouldAllowPut: sinon.stub().returns(true) };
+        const res = {
+          status: sinon.stub().returnsThis(),
+          send: sinon.stub(),
+        };
+        routes['PUT /hours'](validPutReq(), res);
+        await new Promise((r) => setTimeout(r, 200));
+        assert.ok(res.status.calledWith(200));
+      });
+    });
+
+    describe('PUT /hours payload limits', function () {
+      beforeEach(function () {
+        plugin.start(defaultOptions);
+        registerRoutes();
+      });
+
+      it('rejects more than the maximum number of engines', function () {
+        const paths = [];
+        for (let i = 0; i < 65; i += 1) {
+          paths.push({
+            path: `propulsion.e${i}.revolutions`,
+            runTime: 0,
+            runTimeTrip: 0,
+          });
+        }
+        const res = {
+          status: sinon.stub().returnsThis(),
+          send: sinon.stub(),
+        };
+        routes['PUT /hours']({ body: { paths } }, res);
+        assert.ok(res.status.calledWith(400));
+      });
+
+      it('rejects duplicate paths', function () {
+        const req = {
+          body: {
+            paths: [
+              {
+                path: 'propulsion.main.revolutions',
+                runTime: 0,
+                runTimeTrip: 0,
+              },
+              {
+                path: 'propulsion.main.revolutions',
+                runTime: 1,
+                runTimeTrip: 0,
+              },
+            ],
+          },
+        };
+        const res = {
+          status: sinon.stub().returnsThis(),
+          send: sinon.stub(),
+        };
+        routes['PUT /hours'](req, res);
+        assert.ok(res.status.calledWith(400));
+      });
     });
   });
 });
