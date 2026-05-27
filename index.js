@@ -211,17 +211,29 @@ module.exports = function createPlugin(app) {
         delta.updates.forEach((u) => {
           if (!u.values) return;
           u.values.forEach((v) => {
+            // Apply the same path contract used on load and in PUT, so an
+            // unexpected delta path can't be persisted or served by GET /hours.
+            if (typeof v.path !== 'string' || !VALID_PATH.test(v.path)) {
+              app.debug(
+                `Skipping delta with invalid path: ${JSON.stringify(v.path)}`,
+              );
+              return;
+            }
             let engine = engines.paths.find((item) => item.path === v.path);
             let isNew = false;
 
             if (!engine) {
               app.debug('new engine');
               isNew = true;
+              // Shape new engines like loaded ones (default running/time).
+              // sanitizeNumber is omitted here: the counters start at literal 0
+              // and only ever grow by the clamped, finite elapsedSeconds below.
               engine = {
                 path: v.path,
                 runTime: 0,
                 runTimeTrip: 0,
                 running: false,
+                time: new Date().toISOString(),
               };
               engines.paths.push(engine);
             }

@@ -372,10 +372,11 @@ describe('signalk-engine-hours plugin', function () {
       assert.ok(!app.handleMessage.called);
     });
 
-    it('should skip paths that cannot be parsed for engine name', function () {
+    it('should skip paths that do not match the propulsion contract', function () {
       deltaCallback(makeDelta('invalidpath', 100));
 
-      assert.ok(app.debug.calledWithMatch(/Cannot extract engine name/));
+      // Rejected at the path-validation gate before any engine is created.
+      assert.ok(app.debug.calledWithMatch(/Skipping delta with invalid path/));
       // handleMessage should not be called for data (meta check won't happen either)
       const dataCalls = app.handleMessage
         .getCalls()
@@ -948,6 +949,23 @@ describe('signalk-engine-hours plugin', function () {
         plugin.start(defaultOptions);
         await new Promise((r) => setTimeout(r, 100));
         registerRoutes();
+
+        const data = getEngines();
+        assert.equal(data.paths.length, 1);
+        assert.equal(data.paths[0].path, 'propulsion.main.revolutions');
+      });
+    });
+
+    describe('live delta validation', function () {
+      beforeEach(function () {
+        plugin.start(defaultOptions);
+        registerRoutes();
+      });
+
+      it('ignores deltas whose path is not a valid propulsion path', function () {
+        deltaCallback(makeDelta('propulsion.main.revolutions', 100, ts(0)));
+        deltaCallback(makeDelta('not a valid path', 100, ts(0)));
+        deltaCallback(makeDelta('<img src=x onerror=alert(1)>', 100, ts(0)));
 
         const data = getEngines();
         assert.equal(data.paths.length, 1);
