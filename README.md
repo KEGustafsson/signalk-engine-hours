@@ -20,3 +20,4 @@ Signal K engine hours logger keeps engine runtime data in persistent storage. En
 - v1.4.0 feat: improved time calculation accuracy
 - v1.4.1 fix: engine hours accrual bug
 - v1.5.0 feat: engine hours reporing optimized 
+- v1.6.0 fix: accrual clamp, auth, input hardening, UI state
