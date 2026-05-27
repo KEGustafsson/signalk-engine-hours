@@ -8,6 +8,17 @@ module.exports = function createPlugin(app) {
   plugin.description =
     'Persistent engine hour logger. Log all engines, which report revolutions to SignalK';
 
+  // Validates a SignalK propulsion path. Shared by the file loader and the
+  // PUT endpoint so untrusted data cannot reach the persisted store / web UI.
+  const VALID_PATH = /^propulsion\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_.]+$/;
+  // Upper bound on engines accepted in a single PUT — guards against unbounded
+  // payloads exhausting memory / disk.
+  const MAX_ENGINES = 64;
+  // Accrual is capped at this many sampling periods to absorb a couple of
+  // missed updates without counting a long data gap / forward clock jump as
+  // continuous runtime.
+  const MAX_STEP_PERIODS = 3;
+
   let engines = { paths: [] };
   let unsubscribes = [];
   let enginesFile;
@@ -17,10 +28,18 @@ module.exports = function createPlugin(app) {
   const metaPublished = new Set();
 
   function writeToPersistentStore(data) {
+    // A write of the latest state supersedes any pending debounced write.
+    if (writeTimer) {
+      clearTimeout(writeTimer);
+      writeTimer = null;
+    }
+    writeDirty = false;
     const snapshot = JSON.stringify({ engines: data });
     const tmpFile = `${enginesFile}.tmp`;
     writePromise = writePromise
-      .catch(() => {})
+      // Keep the chain alive after a failed write, but don't swallow silently —
+      // the failing caller logs its own error; this surfaces stale ones too.
+      .catch((err) => app.debug(`Previous write failed: ${err.message}`))
       .then(() => writeFile(tmpFile, snapshot, 'utf-8'))
       .then(() => rename(tmpFile, enginesFile));
     return writePromise;
@@ -126,13 +145,26 @@ module.exports = function createPlugin(app) {
           const data = JSON.parse(content);
           if (data && data.engines && Array.isArray(data.engines.paths)) {
             engines = {
-              paths: data.engines.paths.map((p) => ({
-                path: typeof p.path === 'string' ? p.path : '',
-                runTime: sanitizeNumber(p.runTime, 0),
-                runTimeTrip: sanitizeNumber(p.runTimeTrip, 0),
-                running: false, // intentionally non-durable: prevents phantom time accrual across restarts
-                time: p.time || new Date().toISOString(),
-              })),
+              paths: data.engines.paths
+                // Drop entries whose path doesn't match the propulsion format —
+                // an untrusted/corrupt path must not reach GET /hours or the UI.
+                .filter((p) => {
+                  const ok =
+                    typeof p.path === 'string' && VALID_PATH.test(p.path);
+                  if (!ok) {
+                    app.debug(
+                      `Skipping engine with invalid path: ${JSON.stringify(p && p.path)}`,
+                    );
+                  }
+                  return ok;
+                })
+                .map((p) => ({
+                  path: p.path,
+                  runTime: sanitizeNumber(p.runTime, 0),
+                  runTimeTrip: sanitizeNumber(p.runTimeTrip, 0),
+                  running: false, // intentionally non-durable: prevents phantom time accrual across restarts
+                  time: p.time || new Date().toISOString(),
+                })),
             };
           } else {
             app.debug('Invalid data structure in engines.json');
@@ -205,10 +237,17 @@ module.exports = function createPlugin(app) {
             if (previousEngine.running && previousEngine.time) {
               const prevMs = Date.parse(previousEngine.time);
               const currMs = Date.parse(deltaTime);
-              const elapsedSeconds =
-                Number.isFinite(prevMs) && Number.isFinite(currMs)
-                  ? Math.max(0, (currMs - prevMs) / 1000)
-                  : 0;
+              let elapsedSeconds = 0;
+              if (Number.isFinite(prevMs) && Number.isFinite(currMs)) {
+                // Clamp the step: drop negative spans (clock skew / out-of-order
+                // deltas) and cap forward jumps so a dropped data source or
+                // clock step isn't counted as continuous runtime.
+                const span = (currMs - prevMs) / 1000;
+                elapsedSeconds = Math.min(
+                  Math.max(0, span),
+                  updateRate * MAX_STEP_PERIODS,
+                );
+              }
               engine.runTime += elapsedSeconds;
               engine.runTimeTrip += elapsedSeconds;
               app.debug('increment engine hours', {
@@ -240,19 +279,38 @@ module.exports = function createPlugin(app) {
       res.json(engines);
     });
     router.put('/hours', (req, res) => {
-      const newEngines = req.body;
+      // Gate writes through the server's security strategy when one is present.
+      // On an unsecured server (or in tests) securityStrategy is absent and the
+      // request is allowed, matching SignalK's default behaviour.
       if (
-        newEngines &&
-        Array.isArray(newEngines.paths) &&
-        newEngines.paths.every(
+        app.securityStrategy &&
+        typeof app.securityStrategy.shouldAllowPut === 'function' &&
+        !app.securityStrategy.shouldAllowPut(
+          req,
+          'vessels.self',
+          { type: 'plugin', id: plugin.id },
+          'propulsion',
+        )
+      ) {
+        res.status(403).send('Permission denied');
+        return;
+      }
+      const newEngines = req.body;
+      const paths = newEngines && newEngines.paths;
+      if (
+        Array.isArray(paths) &&
+        paths.length <= MAX_ENGINES &&
+        paths.every(
           (p) =>
+            p &&
             typeof p.path === 'string' &&
-            /^propulsion\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_.]+$/.test(p.path) &&
+            VALID_PATH.test(p.path) &&
             Number.isFinite(p.runTime) &&
             p.runTime >= 0 &&
             Number.isFinite(p.runTimeTrip) &&
             p.runTimeTrip >= 0,
-        )
+        ) &&
+        new Set(paths.map((p) => p.path)).size === paths.length
       ) {
         engines = {
           paths: newEngines.paths.map((p) => ({

@@ -1,7 +1,15 @@
 const url = window.location.origin + '/plugins/signalk-engine-hours/hours';
+const SECONDS_PER_HOUR = 3600;
+const ERROR_TIMEOUT_MS = 8000;
+const EDITABLE_FIELDS = ['runTime', 'runTimeTrip'];
 let jsonData = null;
 let isSaving = false;
 let isFetching = false;
+
+function clearErrors() {
+  const errorContainer = document.getElementById('error-container');
+  if (errorContainer) errorContainer.innerHTML = '';
+}
 
 function escapeAttr(str) {
   return str
@@ -24,6 +32,7 @@ function setButtonsEnabled(enabled) {
 async function fetchData() {
   if (isFetching) return;
   isFetching = true;
+  clearErrors();
   setButtonsEnabled(false);
   try {
     const response = await fetch(url);
@@ -49,11 +58,15 @@ function displayJsonData() {
   jsonContainer.innerHTML = '';
 
   jsonData.paths.forEach((pathData, index) => {
-    const matches = pathData.path.match(/[^.]+\.(.+)\.[^.]+/);
+    const rawPath =
+      pathData && typeof pathData.path === 'string' ? pathData.path : '';
+    const matches = rawPath.match(/[^.]+\.(.+)\.[^.]+/);
     const rawName = matches ? matches[1] : 'unknown';
     const safeAttrName = escapeAttr(rawName);
-    const runTimeHours = (pathData.runTime / 3600).toFixed(2);
-    const runTimeTripHours = (pathData.runTimeTrip / 3600).toFixed(2);
+    const runTimeSec = Number(pathData && pathData.runTime) || 0;
+    const runTimeTripSec = Number(pathData && pathData.runTimeTrip) || 0;
+    const runTimeHours = (runTimeSec / SECONDS_PER_HOUR).toFixed(2);
+    const runTimeTripHours = (runTimeTripSec / SECONDS_PER_HOUR).toFixed(2);
 
     const card = document.createElement('div');
     card.className = 'engine-card';
@@ -113,8 +126,16 @@ function displayJsonData() {
 }
 
 function deleteSection(index) {
-  if (jsonData.paths.length <= index) return;
-  const matches = jsonData.paths[index].path.match(/[^.]+\.(.+)\.[^.]+/);
+  if (
+    !jsonData ||
+    !Array.isArray(jsonData.paths) ||
+    jsonData.paths.length <= index
+  ) {
+    return;
+  }
+  const entry = jsonData.paths[index];
+  const entryPath = entry && typeof entry.path === 'string' ? entry.path : '';
+  const matches = entryPath.match(/[^.]+\.(.+)\.[^.]+/);
   const name = matches ? matches[1] : 'this engine';
   if (!confirm(`Delete ${name}? This cannot be undone after saving.`)) return;
   jsonData.paths.splice(index, 1);
@@ -124,6 +145,9 @@ function deleteSection(index) {
 
 async function saveChanges() {
   if (isSaving) return;
+  if (!jsonData || !Array.isArray(jsonData.paths)) return;
+
+  clearErrors();
 
   // Validate all inputs before locking the UI — collect all errors at once
   const inputs = document.querySelectorAll(
@@ -139,8 +163,12 @@ async function saveChanges() {
       errors.push(
         `Invalid value for ${field} at engine ${pathIndex + 1}. Must be a non-negative number.`,
       );
-    } else if (field === 'runTime' || field === 'runTimeTrip') {
-      updates.push({ pathIndex, field, value: Math.round(inputValue * 3600) });
+    } else if (EDITABLE_FIELDS.includes(field)) {
+      updates.push({
+        pathIndex,
+        field,
+        value: Math.round(inputValue * SECONDS_PER_HOUR),
+      });
     }
   }
   if (errors.length > 0) {
@@ -148,23 +176,31 @@ async function saveChanges() {
     return;
   }
 
+  // Build the payload without mutating jsonData — on a failed save the
+  // in-memory state must stay in sync with what the server actually has.
+  const payload = {
+    ...jsonData,
+    paths: jsonData.paths.map((p) => ({ ...p })),
+  };
+  updates.forEach(({ pathIndex, field, value }) => {
+    if (payload.paths[pathIndex]) payload.paths[pathIndex][field] = value;
+  });
+
   isSaving = true;
   setButtonsEnabled(false);
   try {
-    updates.forEach(({ pathIndex, field, value }) => {
-      jsonData.paths[pathIndex][field] = value;
-    });
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(jsonData),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
-    fetchData();
+    // Reload from the server (source of truth) and let it own button state.
+    await fetchData();
   } catch (error) {
     displayErrorMessage(error.message);
   } finally {
@@ -177,6 +213,7 @@ function displayErrorMessage(message) {
   const errorContainer = document.getElementById('error-container');
   const errorDiv = document.createElement('div');
   errorDiv.className = 'alert-modern alert-danger-modern';
+  errorDiv.setAttribute('role', 'alert');
 
   const textSpan = document.createElement('span');
   textSpan.textContent = message;
@@ -192,11 +229,15 @@ function displayErrorMessage(message) {
   errorContainer.appendChild(errorDiv);
   setTimeout(() => {
     if (errorDiv.parentNode) errorDiv.remove();
-  }, 8000);
+  }, ERROR_TIMEOUT_MS);
 }
 
 function checkChanges() {
   const saveButton = document.getElementById('save-button');
+  if (!jsonData || !Array.isArray(jsonData.paths)) {
+    saveButton.style.display = 'none';
+    return;
+  }
   const inputs = document.querySelectorAll(
     'input[data-path-index][data-field]',
   );
@@ -205,13 +246,15 @@ function checkChanges() {
   for (let i = 0; i < inputs.length; i++) {
     const pathIndex = parseInt(inputs[i].dataset.pathIndex, 10);
     const field = inputs[i].dataset.field;
+    const entry = jsonData.paths[pathIndex];
+    if (!entry) continue;
     const inputValue = parseFloat(inputs[i].value);
     if (isNaN(inputValue)) {
       dataChanged = true;
       break;
     }
     const originalDisplayed = parseFloat(
-      (jsonData.paths[pathIndex][field] / 3600).toFixed(2),
+      ((Number(entry[field]) || 0) / SECONDS_PER_HOUR).toFixed(2),
     );
     if (inputValue !== originalDisplayed) {
       dataChanged = true;
