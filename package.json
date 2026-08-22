@@ -1,6 +1,6 @@
 {
   "name": "signalk-engine-hours",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Persistent engine hours logger. Log all engines, which report revolutions to SignalK",
   "main": "index.js",
   "engines": {
@@ -23,7 +23,11 @@
   ],
   "signalk": {
     "appIcon": "./icons/icon-72x72.png",
-    "displayName": "SignalK Engine Hours"
+    "displayName": "SignalK Engine Hours",
+    "screenshots": [
+      "./screenshots/engine-hours-editor.png",
+      "./screenshots/engine-hours-editor-unsaved-changes.png"
+    ]
   },
   "signalk-plugin-enabled-by-default": false,
   "author": "Karl-Erik Gustafsson",
