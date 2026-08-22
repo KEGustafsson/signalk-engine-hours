@@ -1,0 +1,7 @@
+# Keep LF in the working tree on every platform. Without this, Git for Windows
+# checks the repo out with CRLF, and `prettier -c .` (endOfLine: "lf" by
+# default) then fails on every text file in CI.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.png binary
