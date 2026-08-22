@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file.
 
 - chore: add SignalK Plugin CI workflow (Linux x64/arm64, macOS, Windows on Node 22 + 24; armv7/Cerbo GX disabled)
 - docs: add this changelog and App Store screenshots
+- chore: add .gitattributes so text files check out as LF on Windows too,
+  keeping the Prettier check green across the whole CI matrix
 
 ## [1.6.0] - 2026-05-27
 
