@@ -84,6 +84,8 @@ describe('signalk-engine-hours plugin', function () {
       ]);
       assert.equal(plugin.schema.properties.updateRate.default, 60);
       assert.equal(plugin.schema.properties.updateRate.minimum, 1);
+      assert.equal(plugin.schema.properties.minReportInterval.default, 12);
+      assert.equal(plugin.schema.properties.minReportInterval.minimum, 0);
     });
   });
 
@@ -1049,6 +1051,136 @@ describe('signalk-engine-hours plugin', function () {
         routes['PUT /hours'](req, res);
         assert.ok(res.status.calledWith(400));
       });
+    });
+  });
+
+  describe('minimum report interval', function () {
+    const HOUR = 3600 * 1000;
+    const MAIN = 'propulsion.main.revolutions';
+    let clock;
+
+    beforeEach(function () {
+      // Fake only timeouts: setImmediate and fs I/O keep running for real.
+      clock = sinon.useFakeTimers({
+        now: baseMs,
+        toFake: ['setTimeout', 'clearTimeout', 'Date'],
+      });
+    });
+
+    afterEach(function () {
+      plugin.stop();
+      clock.restore();
+    });
+
+    function valueReports() {
+      return app.handleMessage
+        .getCalls()
+        .map((c) => c.args[1].updates[0])
+        .filter((u) => u.values);
+    }
+
+    function stopEngineAt(offsetSec) {
+      deltaCallback(makeDelta(MAIN, 100, ts(0)));
+      deltaCallback(makeDelta(MAIN, 0, ts(offsetSec)));
+    }
+
+    it('re-reports unchanged values every 12h by default', function () {
+      plugin.start({ monitorPath: 'propulsion.*.revolutions' });
+      stopEngineAt(60);
+      const before = valueReports().length;
+      // Repeated "stopped" deltas don't change anything -> no report.
+      deltaCallback(makeDelta(MAIN, 0, ts(120)));
+      assert.equal(valueReports().length, before);
+
+      clock.tick(12 * HOUR - 1);
+      assert.equal(valueReports().length, before);
+      clock.tick(1);
+      assert.equal(valueReports().length, before + 1);
+      const last = valueReports()[before];
+      assert.equal(last.values[0].value, 60);
+      // Periodic reports are stamped now, not with the last-running time.
+      assert.equal(last.timestamp, new Date().toISOString());
+
+      clock.tick(12 * HOUR);
+      assert.equal(valueReports().length, before + 2);
+    });
+
+    it('resets the timer whenever values are reported on change', function () {
+      plugin.start({ ...defaultOptions, minReportInterval: 1 });
+      stopEngineAt(60);
+      const before = valueReports().length;
+      clock.tick(HOUR / 2);
+      deltaCallback(makeDelta(MAIN, 100, ts(120))); // state change -> report
+      assert.equal(valueReports().length, before + 1);
+      clock.tick(HOUR / 2);
+      assert.equal(valueReports().length, before + 1);
+      clock.tick(HOUR / 2);
+      assert.equal(valueReports().length, before + 2);
+    });
+
+    it('honours a custom interval and 0 disables it', function () {
+      plugin.start({ ...defaultOptions, minReportInterval: 0 });
+      stopEngineAt(60);
+      const before = valueReports().length;
+      clock.tick(30 * 24 * HOUR);
+      assert.equal(valueReports().length, before);
+    });
+
+    it('falls back to the default for invalid values', function () {
+      plugin.start({ ...defaultOptions, minReportInterval: -5 });
+      stopEngineAt(60);
+      const before = valueReports().length;
+      clock.tick(12 * HOUR);
+      assert.equal(valueReports().length, before + 1);
+    });
+
+    it('caps very large intervals so the timer cannot overflow', function () {
+      plugin.start({ ...defaultOptions, minReportInterval: 1e9 });
+      stopEngineAt(60);
+      const before = valueReports().length;
+      clock.tick(1000);
+      assert.equal(valueReports().length, before);
+      clock.tick(7 * 24 * HOUR);
+      assert.equal(valueReports().length, before + 1);
+    });
+
+    it('stops periodic reports after plugin.stop', function () {
+      plugin.start(defaultOptions);
+      stopEngineAt(60);
+      plugin.stop();
+      const before = app.handleMessage.callCount;
+      clock.tick(24 * HOUR);
+      assert.equal(app.handleMessage.callCount, before);
+    });
+
+    it('publishes PUT edits immediately and drops removed engines', function () {
+      const routes = {};
+      plugin.registerWithRouter({
+        get: (p, h) => {
+          routes[`GET ${p}`] = h;
+        },
+        put: (p, h) => {
+          routes[`PUT ${p}`] = h;
+        },
+      });
+      plugin.start({ ...defaultOptions, minReportInterval: 1 });
+      stopEngineAt(60);
+      deltaCallback(makeDelta('propulsion.port.revolutions', 0, ts(60)));
+      const res = { status: sinon.stub().returnsThis(), send: sinon.stub() };
+      routes['PUT /hours'](
+        { body: { paths: [{ path: MAIN, runTime: 7200, runTimeTrip: 0 }] } },
+        res,
+      );
+      const after = valueReports();
+      const putReport = after[after.length - 1];
+      assert.equal(putReport.values[0].path, 'propulsion.main.runTime');
+      assert.equal(putReport.values[0].value, 7200);
+
+      const before = after.length;
+      clock.tick(HOUR);
+      const periodic = valueReports().slice(before);
+      assert.equal(periodic.length, 1);
+      assert.equal(periodic[0].values[0].path, 'propulsion.main.runTime');
     });
   });
 });
