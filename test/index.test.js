@@ -1167,14 +1167,28 @@ describe('signalk-engine-hours plugin', function () {
       stopEngineAt(60);
       deltaCallback(makeDelta('propulsion.port.revolutions', 0, ts(60)));
       const res = { status: sinon.stub().returnsThis(), send: sinon.stub() };
+      clock.tick(HOUR / 2);
+      const staleTime = ts(0);
       routes['PUT /hours'](
-        { body: { paths: [{ path: MAIN, runTime: 7200, runTimeTrip: 0 }] } },
+        {
+          body: {
+            paths: [
+              { path: MAIN, runTime: 7200, runTimeTrip: 0, time: staleTime },
+            ],
+          },
+        },
         res,
       );
       const after = valueReports();
       const putReport = after[after.length - 1];
       assert.equal(putReport.values[0].path, 'propulsion.main.runTime');
       assert.equal(putReport.values[0].value, 7200);
+      // Published with the current time, not the (stale) time from the body,
+      // while the stored time used for accrual is kept as sent.
+      assert.equal(putReport.timestamp, new Date().toISOString());
+      const getRes = { json: sinon.stub() };
+      routes['GET /hours']({}, getRes);
+      assert.equal(getRes.json.getCall(0).args[0].paths[0].time, staleTime);
 
       const before = after.length;
       clock.tick(HOUR);

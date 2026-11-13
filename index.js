@@ -122,7 +122,7 @@ module.exports = function createPlugin(app) {
       const engine = engines.paths.find((item) => item.path === path);
       if (engine) {
         app.debug(`periodic report: ${path}`);
-        reportData(engine, true);
+        reportData(engine, { stampNow: true });
       }
     }, minReportIntervalMs);
     if (typeof timer.unref === 'function') timer.unref();
@@ -134,7 +134,9 @@ module.exports = function createPlugin(app) {
     minReportIntervalMs = resolveMinReportIntervalMs(options.minReportInterval);
     enginesFile = join(app.getDataDirPath(), 'engines.json');
 
-    reportData = function report(engine, periodic = false) {
+    // stampNow: publish with the current time instead of engine.time (the
+    // last-running time), for re-sends and edits that are not new measurements.
+    reportData = function report(engine, { stampNow = false } = {}) {
       const matches = engine.path.match(/^propulsion\.([^.]+)\./);
       if (!matches) {
         app.debug(`Cannot extract engine name from path: ${engine.path}`);
@@ -146,9 +148,7 @@ module.exports = function createPlugin(app) {
         updates: [
           {
             source: { label: plugin.id },
-            // A periodic report re-publishes current values now; using the
-            // last-running time would hand consumers a stale timestamp.
-            timestamp: (!periodic && engine.time) || new Date().toISOString(),
+            timestamp: (!stampNow && engine.time) || new Date().toISOString(),
             values: [
               {
                 path: `propulsion.${engineName}.runTime`,
@@ -400,7 +400,11 @@ module.exports = function createPlugin(app) {
         Array.from(reportTimers.keys())
           .filter((p) => !keep.has(p))
           .forEach(clearReportTimer);
-        engines.paths.forEach((engine) => reportData(engine));
+        // Stamp with now: an edit is current data, and the time in the PUT body
+        // may be stale. engine.time itself is kept for runtime accrual.
+        engines.paths.forEach((engine) =>
+          reportData(engine, { stampNow: true }),
+        );
         writeToPersistentStore(engines)
           .then(() => res.status(200).send('OK'))
           .catch((err) => {
