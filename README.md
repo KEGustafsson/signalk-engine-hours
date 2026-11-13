@@ -2,6 +2,14 @@
 
 Signal K engine hours logger keeps engine runtime data in persistent storage. Engines that report revolutions to the Signal K server are logged automatically. Users can change how often engine revolutions are monitored; the current default is 60s. When the Signal K server starts, previously logged data is read from persistent storage. Runtime data is written to persistent storage shortly after changes (debounced). From the WebApp, engine runtimes can be set and changed.
 
+![Engine Hours Editor](docs/screenshots/main.png)
+
+## Configuration
+
+- **Detect engine running by monitoring** — `propulsion.*.revolutions` (default) or `propulsion.*.state`.
+- **updateRate** — how often engine revolutions/state is sampled, in seconds. Default 60s.
+- **minReportInterval** — runtime values (`propulsion.*.runTime`, `propulsion.*.runTimeTrip`) are published to Signal K when they change, and in addition at least this often (hours), so consumers such as loggers and dashboards keep receiving values while an engine is stopped. Default 12h, maximum 168h, `0` disables periodic reports.
+
 ## Versions
 
 - v0.0.1 Initial release
@@ -14,10 +22,13 @@ Signal K engine hours logger keeps engine runtime data in persistent storage. En
 - v0.4.0 tooltip to show hrs:min
 - v1.0.0 1st release
 - v1.1.0 fix: improve error handling and validation for engine data
-- v1.2.0 feat: option to monitor propulsion.*.state
+- v1.2.0 feat: option to monitor propulsion.\*.state
 - v1.3.0 new UI and fixes to code
 - v1.3.1 chore: clean-up
 - v1.4.0 feat: improved time calculation accuracy
 - v1.4.1 fix: engine hours accrual bug
-- v1.5.0 feat: engine hours reporing optimized 
+- v1.5.0 feat: engine hours reporting optimized
 - v1.6.0 fix: accrual clamp, auth, input hardening, UI state
+- v1.7.0 feat: minimum report interval (default 12h), publish edits immediately, Signal K plugin CI
+
+See [CHANGELOG.md](CHANGELOG.md) for details.

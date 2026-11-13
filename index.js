@@ -18,6 +18,12 @@ module.exports = function createPlugin(app) {
   // missed updates without counting a long data gap / forward clock jump as
   // continuous runtime.
   const MAX_STEP_PERIODS = 3;
+  // Default minimum report interval (hours). Values are otherwise only
+  // published on change, so a stopped engine would go silent indefinitely.
+  const DEFAULT_MIN_REPORT_HOURS = 12;
+  // setTimeout overflows (fires immediately) above 2^31-1 ms (~24.8 days);
+  // cap the interval well below that.
+  const MAX_MIN_REPORT_HOURS = 24 * 7;
 
   let engines = { paths: [] };
   let unsubscribes = [];
@@ -26,6 +32,23 @@ module.exports = function createPlugin(app) {
   let writeDirty = false;
   let writeTimer = null;
   const metaPublished = new Set();
+  // path -> timer re-publishing that engine's values if nothing else has
+  // within the minimum report interval.
+  const reportTimers = new Map();
+  let minReportIntervalMs = 0;
+
+  function clearReportTimer(path) {
+    const timer = reportTimers.get(path);
+    if (timer) {
+      clearTimeout(timer);
+      reportTimers.delete(path);
+    }
+  }
+
+  function clearAllReportTimers() {
+    reportTimers.forEach((timer) => clearTimeout(timer));
+    reportTimers.clear();
+  }
 
   function writeToPersistentStore(data) {
     // A write of the latest state supersedes any pending debounced write.
@@ -76,11 +99,44 @@ module.exports = function createPlugin(app) {
     return Number.isFinite(val) && val >= 0 ? val : fallback;
   }
 
+  // Resolves the minimum report interval option (hours) to milliseconds.
+  // 0 disables periodic reporting; invalid values fall back to the default.
+  function resolveMinReportIntervalMs(value) {
+    const hours =
+      typeof value === 'number' && Number.isFinite(value) && value >= 0
+        ? Math.min(value, MAX_MIN_REPORT_HOURS)
+        : DEFAULT_MIN_REPORT_HOURS;
+    return hours * 3600 * 1000;
+  }
+
+  // Set by start(); publishes an engine's values to SignalK.
+  let reportData = () => {};
+
+  // (Re)arms the periodic report for an engine. Every report resets the
+  // timer, so values are re-sent only after a full quiet interval.
+  function armReportTimer(path) {
+    clearReportTimer(path);
+    if (!minReportIntervalMs) return;
+    const timer = setTimeout(() => {
+      reportTimers.delete(path);
+      const engine = engines.paths.find((item) => item.path === path);
+      if (engine) {
+        app.debug(`periodic report: ${path}`);
+        reportData(engine, { stampNow: true });
+      }
+    }, minReportIntervalMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    reportTimers.set(path, timer);
+  }
+
   plugin.start = function start(options) {
     const updateRate = Math.max(1, options.updateRate || 60);
+    minReportIntervalMs = resolveMinReportIntervalMs(options.minReportInterval);
     enginesFile = join(app.getDataDirPath(), 'engines.json');
 
-    function reportData(engine) {
+    // stampNow: publish with the current time instead of engine.time (the
+    // last-running time), for re-sends and edits that are not new measurements.
+    reportData = function report(engine, { stampNow = false } = {}) {
       const matches = engine.path.match(/^propulsion\.([^.]+)\./);
       if (!matches) {
         app.debug(`Cannot extract engine name from path: ${engine.path}`);
@@ -92,7 +148,7 @@ module.exports = function createPlugin(app) {
         updates: [
           {
             source: { label: plugin.id },
-            timestamp: engine.time || new Date().toISOString(),
+            timestamp: (!stampNow && engine.time) || new Date().toISOString(),
             values: [
               {
                 path: `propulsion.${engineName}.runTime`,
@@ -137,7 +193,8 @@ module.exports = function createPlugin(app) {
       setImmediate(() =>
         app.emit('connectionwrite', { providerId: plugin.id }),
       );
-    }
+      armReportTimer(engine.path);
+    };
 
     readFile(enginesFile, 'utf-8')
       .then((content) => {
@@ -336,6 +393,18 @@ module.exports = function createPlugin(app) {
                 : new Date().toISOString(),
           })),
         };
+        // Publish the edited values right away (SignalK would otherwise keep
+        // the old ones until the next change) and drop timers for removed
+        // engines.
+        const keep = new Set(engines.paths.map((p) => p.path));
+        Array.from(reportTimers.keys())
+          .filter((p) => !keep.has(p))
+          .forEach(clearReportTimer);
+        // Stamp with now: an edit is current data, and the time in the PUT body
+        // may be stale. engine.time itself is kept for runtime accrual.
+        engines.paths.forEach((engine) =>
+          reportData(engine, { stampNow: true }),
+        );
         writeToPersistentStore(engines)
           .then(() => res.status(200).send('OK'))
           .catch((err) => {
@@ -351,6 +420,8 @@ module.exports = function createPlugin(app) {
   plugin.stop = function stop() {
     unsubscribes.forEach((f) => f());
     unsubscribes = [];
+    clearAllReportTimers();
+    reportData = () => {};
     const flushed = flushWrite();
     engines = { paths: [] };
     metaPublished.clear();
@@ -373,6 +444,14 @@ module.exports = function createPlugin(app) {
         minimum: 1,
         title:
           'How often engine revolutions/state is monitored. Default value is 60s',
+      },
+      minReportInterval: {
+        type: 'number',
+        default: DEFAULT_MIN_REPORT_HOURS,
+        minimum: 0,
+        maximum: MAX_MIN_REPORT_HOURS,
+        title:
+          'Minimum report interval (hours): runtime values are re-sent to SignalK at least this often, even when unchanged. 0 disables. Default value is 12h',
       },
     },
   };
